@@ -90,7 +90,7 @@ function AnswerCard({ problemId, number, prompt, locked }: { problemId: string; 
           data-testid="answer-input"
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
-          placeholder="e.g. 6x*cos(3x^2)"
+          placeholder="e.g. 3x^2 + 2"
           disabled={locked}
           maxLength={200}
           autoComplete="off"
@@ -106,7 +106,7 @@ function AnswerCard({ problemId, number, prompt, locked }: { problemId: string; 
           data-testid="explanation-input"
           value={explanation}
           onChange={(e) => setExplanation(e.target.value)}
-          placeholder="e.g. derivative of sin is cos, times the inside's derivative"
+          placeholder="e.g. used the power rule on each term"
           disabled={locked}
           maxLength={280}
         />
