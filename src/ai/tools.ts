@@ -1,84 +1,37 @@
 /**
- * AI Tool Definitions — converts DeepSpace BUILT_IN_TOOLS to Vercel AI SDK tools.
+ * AI tools for the in-app hint assistant and the local agent (one definition
+ * for both surfaces, registered once via `registerAgent` in worker.ts).
  *
- * The assistant can read AND modify data. Per-collection RBAC at the DO
- * layer is the actual security boundary — the user's role determines what
- * each tool call is allowed to do, regardless of what's in this allowlist.
- * Trim entries below if you want a stricter assistant for your app.
+ * TutorPulse's assistant is READ-ONLY: write tools are left out of
+ * ALLOWED_TOOL_NAMES, and the built-in read tools run as the calling user, so
+ * per-collection RBAC still decides what they return (a student gets no
+ * answer keys, clusters or other students' submissions — see T4).
+ *
+ * Two custom tools ground hints in the live session: `get_current_problem`
+ * and `search_notes`. Neither takes a session id: the server derives the
+ * caller's live session itself, so a student cannot aim them elsewhere.
  */
 
 import { jsonSchema, tool } from 'ai'
 import type { ToolSet } from 'ai'
 import { z } from 'zod/v4'
-import { BUILT_IN_TOOLS, applyAiToolDefaults } from 'deepspace/worker'
-import type { ToolSchema, CollectionSchema } from 'deepspace/worker'
+import { BUILT_IN_TOOLS, applyAiToolDefaults, knowledge } from 'deepspace/worker'
+import type { AgentToolContext, ToolSchema } from 'deepspace/worker'
+import type { Env } from '../../worker'
+import type { ProblemData } from '../actions/types'
+import { findActiveSession, queryRecords } from '../server/owner-records'
 
 type ToolExecutor = (toolName: string, params: Record<string, unknown>) => Promise<unknown>
 
-const ALLOWED_TOOL_NAMES = [
-  'schema.list',
-  'schema.describe',
-  'records.query',
-  'records.get',
-  'records.create',
-  'records.update',
-  'records.delete',
-  'user.current',
-]
-
-// ============================================================================
-// System prompt
-// ============================================================================
-
-type Interpretation = CollectionSchema['columns'][number]['interpretation']
-
-/**
- * Interpretation is `string | Record<string, unknown>`. When it's an object
- * the convention across the SDK's schemas is `{ kind: string, ... }`.
- * Narrow safely to a human-readable name.
- */
-function interpretationLabel(interpretation: Interpretation): string {
-  if (typeof interpretation === 'string') return interpretation
-  const kind = interpretation.kind
-  return typeof kind === 'string' ? kind : 'object'
-}
-
-export function buildSystemPrompt(appName: string, schemas: CollectionSchema[]): string {
-  const schemaSummary = schemas
-    .map((s) => {
-      const cols = (s.columns ?? [])
-        .map((c) => `${c.name}:${interpretationLabel(c.interpretation)}${c.required ? '!' : ''}`)
-        .join(', ')
-      return `- ${s.name}${cols ? ` (${cols})` : ''}`
-    })
-    .join('\n')
-
-  return [
-    `You are the assistant for the "${appName}" app on DeepSpace.`,
-    "You can read and modify the user's data via the available tools. The",
-    "user's own role and permissions still apply at the data layer — your",
-    'tool calls run as the calling user, so you can only do what they could.',
-    '',
-    'Be careful with mutations:',
-    '- Confirm intent before destructive actions (delete, bulk update).',
-    '- Operate only on collections the user explicitly mentioned.',
-    '- After a successful write, briefly confirm what changed.',
-    '- If a write is denied (RBAC), tell the user plainly — do not retry blindly.',
-    '',
-    'Use tools to look up facts before answering. Do not invent data.',
-    'If data is missing, say so plainly. Keep answers concise.',
-    '',
-    'Available collections:',
-    schemaSummary || '(none)',
-  ].join('\n')
-}
+// Read-only on purpose: no records.create / update / delete (F13).
+const ALLOWED_TOOL_NAMES = ['schema.list', 'schema.describe', 'records.query', 'records.get', 'user.current']
 
 // ============================================================================
 // Tool definitions
 // ============================================================================
 
-export function buildTools(executor: ToolExecutor): ToolSet {
-  const tools: ToolSet = {}
+export function buildTools(executor: ToolExecutor, context?: AgentToolContext<Env>): ToolSet {
+  const tools: ToolSet = context ? buildHintTools(context) : {}
 
   for (const def of BUILT_IN_TOOLS) {
     if (!ALLOWED_TOOL_NAMES.includes(def.name)) continue
@@ -95,6 +48,53 @@ export function buildTools(executor: ToolExecutor): ToolSet {
   }
 
   return tools
+}
+
+// ============================================================================
+// Hint tools (F13)
+// ============================================================================
+
+const NOT_IN_SESSION = { error: 'You are not in a live TutorPulse session right now.' }
+
+function buildHintTools(context: AgentToolContext<Env>): ToolSet {
+  const { env, userId } = context
+  return {
+    get_current_problem: tool({
+      description: 'Get the problem the tutor is currently showing in your live session (prompt in LaTeX), plus the topic on the board if any. Never includes the answer.',
+      inputSchema: z.object({}),
+      execute: async () => {
+        const active = await findActiveSession(env, userId)
+        if (!active) return NOT_IN_SESSION
+        const { session } = active
+        const problems = (await queryRecords<ProblemData>(env, 'problems', { sessionId: session.recordId }))
+          .filter((p) => p.createdBy === session.createdBy)
+          .sort((a, b) => a.data.order - b.data.order)
+        const index = problems.findIndex((p) => p.recordId === session.data.currentProblemId)
+        if (index < 0) return { session: session.data.title, message: 'The tutor has not shown a problem yet.' }
+        return {
+          session: session.data.title,
+          problemNumber: index + 1,
+          prompt: problems[index].data.prompt,
+          topicOnBoard: session.data.focusLabel || null,
+        }
+      },
+    }),
+    search_notes: tool({
+      description: "Search the tutor's uploaded notes for this session. Use it to ground hints in the tutor's own explanations.",
+      inputSchema: z.object({ query: z.string().min(2).max(300).describe('What to look up, e.g. "chain rule inner function"') }),
+      execute: async ({ query }: { query: string }) => {
+        const active = await findActiveSession(env, userId)
+        if (!active) return NOT_IN_SESSION
+        try {
+          const found = await knowledge(env).scoped({ folder: active.session.recordId }).search(query, { mode: 'hybrid', limit: 5 })
+          if (found.chunks.length === 0) return { results: [], note: 'No matching notes (the tutor may not have uploaded any).' }
+          return { results: found.chunks.map((c) => ({ source: c.filename ?? 'notes', text: c.text.slice(0, 1200) })) }
+        } catch {
+          return { results: [], note: 'Notes are not available right now.' }
+        }
+      },
+    }),
+  }
 }
 
 // ============================================================================

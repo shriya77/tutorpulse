@@ -10,6 +10,13 @@
  * Lives in its own file so worker.ts can stay small and the streaming
  * handler's full context (compaction, tools, persistence, abort handling)
  * is co-located rather than scattered through the entry file.
+ *
+ * TutorPulse changes (F13 hint assistant, marked "TutorPulse:" below):
+ *  - a turn is allowed only while the caller is in a live session (tutor or
+ *    joined student), and each session has a turn cap;
+ *  - the app owner pays (no caller authToken), with a fixed fast model,
+ *    because students may have no DeepSpace credits of their own;
+ *  - the system prompt is the Socratic hint prompt (src/ai/prompts/hint.ts).
  */
 
 import type { Context, Hono } from 'hono'
@@ -34,8 +41,12 @@ import {
   loggableError,
 } from 'deepspace/worker'
 import type { AgentToolAccessResult, AgentToolRouteOptions, ChatTurn } from 'deepspace/worker'
-import { schemas } from '../schemas.js'
-import { buildSystemPrompt } from './tools.js'
+import { MAX_HINT_TURNS_PER_SESSION } from '../lib/limits.js'
+import { findActiveSession, updateRecord } from '../server/owner-records.js'
+import { buildHintInstructions } from './prompts/hint.js'
+
+/** TutorPulse: hints always use this model (owner-billed; cheap and fast). */
+const HINT_MODEL = 'claude-haiku-5-5'
 // Type-only — TypeScript strips these at runtime, so no circular import
 // with worker.ts (which imports `registerAiChatRoutes` from this file).
 import type { Env, AppContext } from '../../worker.js'
@@ -151,7 +162,7 @@ export function registerAiChatRoutes(
     const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
     if (!jwt) return c.json({ error: 'Unauthorized' }, 401)
 
-    const { chatId, userMessageId, content, modelId } = await c.req.json<{
+    const { chatId, userMessageId, content } = await c.req.json<{
       chatId?: string
       userMessageId?: string
       content?: string
@@ -165,18 +176,23 @@ export function registerAiChatRoutes(
     if (content.length > MAX_USER_CONTENT_LENGTH) {
       return c.json({ error: `content exceeds ${MAX_USER_CONTENT_LENGTH} chars` }, 413)
     }
-    const selectedModel = resolveDeepSpaceAgentModel(modelId, 'application')
+    // TutorPulse: hints exist only inside a live session, within its cap.
+    const active = await findActiveSession(c.env, auth.userId)
+    if (!active) {
+      return c.json({ error: 'Hints are available during a live session you have joined.', code: 'no_live_session' }, 403)
+    }
+    const turnsUsed = active.session.data.hintTurns ?? 0
+    if (turnsUsed >= MAX_HINT_TURNS_PER_SESSION) {
+      return c.json({ error: 'This session has used all its hints. Ask your tutor!', code: 'hint_cap_reached' }, 429)
+    }
+    await updateRecord(c.env, 'sessions', active.session.recordId, { hintTurns: turnsUsed + 1 })
+
+    // TutorPulse: the client's model choice is ignored; the owner pays for hints.
+    const selectedModel = resolveDeepSpaceAgentModel(HINT_MODEL, 'application')
     if (!selectedModel) {
-      // Name the valid ids: the caller has no other way to learn them here.
       const modelIds = listDeepSpaceAgentModels('application').map((model) => model.id)
-      return c.json(
-        {
-          error: `Unknown modelId: ${modelId}. Valid: ${modelIds.join(', ')}`,
-          code: 'unknown_model',
-          modelIds,
-        },
-        400,
-      )
+      console.error(`[ai-chat] hint model ${HINT_MODEL} not in catalog: ${modelIds.join(', ')}`)
+      return c.json({ error: 'The hint assistant is unavailable right now.' }, 503)
     }
 
     const stub = recordRoomStub(c.env)
@@ -220,8 +236,8 @@ export function registerAiChatRoutes(
         ? { text: chat.compactedSummary, throughId: chat.compactedThroughId }
         : undefined
 
-    // User-billed: compaction is part of the user's chat experience, not infra.
-    const summarizer = makeDefaultSummarizer(c.env, { authToken: jwt })
+    // TutorPulse: owner-billed like the rest of the hint turn.
+    const summarizer = makeDefaultSummarizer(c.env)
     const { messages: prepared, newSummary } = await prepareMessagesWithCompaction(
       turns,
       DEFAULT_CONTEXT_CONFIG,
@@ -240,7 +256,7 @@ export function registerAiChatRoutes(
       provider: selectedModel.provider,
       modelId: usedModelId,
     }
-    const baseSystem = buildSystemPrompt(c.env.APP_NAME, schemas)
+    const baseSystem = buildHintInstructions(active.role)
 
     // Compaction inserts at most one summary system message at index 0; fold
     // it into the top-level `system` so we don't pass two system roles. Then
@@ -351,7 +367,7 @@ export function registerAiChatRoutes(
     const { result } = streamDeepSpaceAgent(c.env, {
       profile: 'application',
       modelId: usedModelId,
-      authToken: jwt,
+      // TutorPulse: no authToken → billed to the app owner (capped above).
       instructions: systemText,
       messages,
       tools,

@@ -7,12 +7,13 @@
  */
 
 import { useEffect, useState, type FormEvent } from 'react'
-import { usePresenceRoom, useQuery } from 'deepspace'
+import { useAuth, usePresenceRoom, useQuery } from 'deepspace'
 import { Button, Input, Label } from '@/components/ui'
 import type { Envelope, SessionData, SubmissionData } from '../../actions/types'
 import { useSessionProblems } from '../../hooks/useSessionData'
 import { callAction } from '../../lib/callAction'
 import { MathText } from '../MathText'
+import { HintPanel } from './HintPanel'
 import { PracticeSetLink } from './PracticeSetLink'
 
 /** What a student shares with the tutor's live roster (F10). Ephemeral, never stored. */
@@ -28,6 +29,7 @@ export function StudentView({ session }: { session: Envelope<SessionData> }) {
   const { records: mySubmissions } = useQuery<SubmissionData>('submissions', { where: { sessionId: session.recordId } })
   const [stuck, setStuck] = useState(false)
   const { connected, updateState } = usePresenceRoom(`session:${session.recordId}`)
+  const { userId } = useAuth()
 
   const index = problems.findIndex((p) => p.recordId === session.data.currentProblemId)
   const problem = problems[index]
@@ -86,6 +88,7 @@ export function StudentView({ session }: { session: Envelope<SessionData> }) {
           >
             {stuck ? 'Tutor notified — tap if you’re unstuck' : 'I’m stuck'}
           </Button>
+          {userId && <HintPanel userId={userId} />}
         </>
       )}
     </div>
