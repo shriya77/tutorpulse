@@ -196,7 +196,10 @@ function AddProblem({ sessionId, nextOrder }: { sessionId: string; nextOrder: nu
   return (
     <form onSubmit={onSubmit} className="space-y-3 rounded-xl border border-dashed border-border p-4" aria-label="Add a problem">
       <h3 className="text-sm font-medium text-foreground">Add a problem</h3>
-      <ProblemFields idPrefix="new" {...{ prompt, setPrompt, answer, setAnswer, mistakes, setMistakes }} />
+      {/* Locked while saving: the form clears when the save lands, which would wipe anything typed meanwhile. */}
+      <fieldset disabled={busy} className="contents">
+        <ProblemFields idPrefix="new" {...{ prompt, setPrompt, answer, setAnswer, mistakes, setMistakes }} />
+      </fieldset>
       <Button type="submit" size="sm" disabled={!ready || busy || !prompt.trim() || !answer.trim()} data-testid="add-problem">
         {busy ? 'Adding…' : 'Add problem'}
       </Button>
