@@ -36,7 +36,7 @@ describe('collection schemas', () => {
   it('a tutor client cannot write server-owned session fields', () => {
     const schema = schemas.find((s) => s.name === 'sessions')!
     const writable = schema.permissions.member.writableFields ?? []
-    for (const field of ['joinCode', 'status', 'participantIds', 'clusterRuns', 'practiceSetRuns']) {
+    for (const field of ['joinCode', 'status', 'participantIds', 'clusterRuns', 'practiceSetRuns', 'hintTurns']) {
       expect(writable).not.toContain(field)
     }
   })

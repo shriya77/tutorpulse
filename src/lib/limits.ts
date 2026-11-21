@@ -5,3 +5,10 @@
  */
 export const MAX_CLUSTER_RUNS_PER_SESSION = 30
 export const MAX_PRACTICE_SETS_PER_SESSION = 5
+
+/** Hint-assistant turns per session (owner-billed; REQUIREMENTS → AI cost). */
+export const MAX_HINT_TURNS_PER_SESSION = 200
+
+/** Notes uploads: the knowledge base rejects non-text parts over 4 MiB (docs/SDK_NOTES.md Q4). */
+export const MAX_NOTES_BYTES = 4 * 1024 * 1024
+export const NOTES_MIME_TYPES = ['application/pdf', 'text/plain', 'text/markdown']

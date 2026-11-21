@@ -14,6 +14,7 @@ export type SessionData = {
   participantIds: string[]
   clusterRuns: number
   practiceSetRuns: number
+  hintTurns?: number
 }
 
 export type ProblemData = {

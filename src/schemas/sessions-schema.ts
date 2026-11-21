@@ -29,6 +29,7 @@ export const sessionsSchema: CollectionSchema = {
     /** AI usage counters, checked against src/lib/limits.ts before any AI job is enqueued. */
     { name: 'clusterRuns', storage: 'number', interpretation: 'plain', default: 0 },
     { name: 'practiceSetRuns', storage: 'number', interpretation: 'plain', default: 0 },
+    { name: 'hintTurns', storage: 'number', interpretation: 'plain', default: 0 },
   ],
   collaboratorsField: 'participantIds',
   permissions: {

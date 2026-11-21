@@ -37,6 +37,11 @@ NATIVE_AUTH_REDIRECT_URIS = ""
 tag = "v1"
 new_sqlite_classes = ["AppRecordRoom", "AppYjsRoom", "AppCanvasRoom", "AppPresenceRoom", "AppCronRoom", "AppJobRoom"]
 
+# Managed knowledge (AI Search) for tutor notes; owner-billed (F14, docs/SDK_NOTES.md Q4).
+[[ai_search]]
+binding = "KNOWLEDGE"
+instance_name = "auto"
+
 [durable_objects]
 bindings = [
   { name = "RECORD_ROOMS", class_name = "AppRecordRoom" },

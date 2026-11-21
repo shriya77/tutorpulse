@@ -14,6 +14,7 @@ import { callAction } from '../../lib/callAction'
 import { OTHER_LABEL } from '../../lib/clusters'
 import { MathText } from '../MathText'
 import { ProblemEditor } from './ProblemEditor'
+import { NotesPanel } from './NotesPanel'
 import { PracticeSetPanel } from './PracticeSetPanel'
 import { TutorRoster } from './TutorRoster'
 
@@ -29,6 +30,7 @@ export function TutorView({ session }: { session: Envelope<SessionData> }) {
       <div className="space-y-6">
         <OpenSessionBar session={session} problemCount={problems.length} missingKeys={problems.filter((p) => !byProblem.has(p.recordId)).length} />
         <ProblemEditor sessionId={session.recordId} problems={problems} keys={byProblem} />
+        <NotesPanel sessionId={session.recordId} />
       </div>
     )
   }
@@ -44,6 +46,7 @@ export function TutorView({ session }: { session: Envelope<SessionData> }) {
           {editing ? 'Done editing problems' : 'Edit problems'}
         </Button>
         {editing && <ProblemEditor sessionId={session.recordId} problems={problems} keys={byProblem} />}
+        {editing && session.data.status === 'open' && <NotesPanel sessionId={session.recordId} />}
       </section>
     </div>
   )

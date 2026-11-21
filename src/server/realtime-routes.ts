@@ -11,6 +11,7 @@ import type { Context, Hono } from 'hono'
 import { authenticatedRoomRequest, resolveAppRole, verifyJwt } from 'deepspace/worker'
 import type { JwtVerifierConfig, VerifyResult } from 'deepspace/worker'
 import type { AppContext, Env } from '../../worker.js'
+import { isSessionMember } from './owner-records.js'
 
 function jwtConfig(env: Env): JwtVerifierConfig {
   return { publicKey: env.AUTH_JWT_PUBLIC_KEY, issuer: env.AUTH_JWT_ISSUER }
@@ -40,30 +41,6 @@ function wsRoute(
     const namespace = doNamespace(c.env)
     const stub = namespace.get(namespace.idFromName(id))
     return stub.fetch(roomRequest)
-  }
-}
-
-/** True when the user is the session's tutor (creator) or a joined student. */
-export async function isSessionMember(env: Env, sessionId: string, userId: string): Promise<boolean> {
-  const stub = env.RECORD_ROOMS.get(env.RECORD_ROOMS.idFromName(`app:${env.DEEPSPACE_APP_ID}`))
-  try {
-    const res = await stub.fetch(
-      new Request('https://internal/api/tools/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-User-Id': env.OWNER_USER_ID, 'X-App-Action': 'true' },
-        body: JSON.stringify({ tool: 'records.get', params: { collection: 'sessions', recordId: sessionId } }),
-      }),
-    )
-    const json = (await res.json()) as {
-      success?: boolean
-      data?: { record?: { createdBy?: string; data?: { participantIds?: unknown } } }
-    }
-    const record = json.success ? json.data?.record : undefined
-    if (!record) return false
-    const participants = Array.isArray(record.data?.participantIds) ? record.data.participantIds : []
-    return record.createdBy === userId || participants.includes(userId)
-  } catch {
-    return false
   }
 }
 
