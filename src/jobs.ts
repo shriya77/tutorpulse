@@ -41,9 +41,18 @@
 
 import type { Job, JobContext } from 'deepspace/worker'
 import type { Env } from '../worker'
+import { CLUSTER_JOB, type ClusterJobPayload } from './actions/clustering-trigger'
+import { runClusterJob } from './jobs/cluster-problem'
 
-export async function runJob(job: Job, _ctx: JobContext, _env: Env): Promise<unknown> {
+/**
+ * Jobs are enqueued only by server actions (the job room is admin-only), so
+ * payloads come from trusted code; each handler still re-reads and re-checks
+ * every record it touches.
+ */
+export async function runJob(job: Job, ctx: JobContext, env: Env): Promise<unknown> {
   switch (job.type) {
+    case CLUSTER_JOB:
+      return await runClusterJob(job.payload as ClusterJobPayload, ctx, env)
     default:
       throw new Error(`Unknown job type: ${job.type}`)
   }

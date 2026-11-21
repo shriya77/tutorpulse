@@ -24,6 +24,7 @@ import { registerAgent } from './src/ai/agent.js'
 import { buildTools } from './src/ai/tools.js'
 import { tasks as cronTasks, runTask as runCronTask } from './src/cron.js'
 import { runJob } from './src/jobs.js'
+import { CLUSTER_JOB } from './src/actions/clustering-trigger.js'
 import { schemas } from './src/schemas.js'
 import { registerActionRoutes } from './src/server/action-routes.js'
 import {
@@ -83,7 +84,13 @@ export class AppJobRoom extends JobRoom<Env> {
   }
 
   protected async onJob(job: Job, context: JobContext): Promise<unknown> {
-    return await runJob(job, context, this.env)
+    const result = await runJob(job, context, this.env)
+    // Clustering is debounced per problem: if answers arrived during a run,
+    // the job reports `rerun` and we chain exactly one more (in-isolate enqueue).
+    if (job.type === CLUSTER_JOB && (result as { rerun?: boolean } | undefined)?.rerun) {
+      this.enqueue(CLUSTER_JOB, job.payload, { maxAttempts: 2 })
+    }
+    return result
   }
 }
 

@@ -32,3 +32,31 @@ export interface Envelope<T> {
   createdAt: string
   updatedAt: string
 }
+
+export type AnswerKeyData = {
+  problemId: string
+  answer: string
+  expectedMistakes?: string
+}
+
+export type SubmissionData = {
+  sessionId: string
+  problemId: string
+  studentId: string
+  tutorIds: string[]
+  answer: string
+  explanation: string
+  isCorrect: number
+  needsReview: number
+  revision: number
+}
+
+export type ClusterData = {
+  sessionId: string
+  problemId: string
+  label: string
+  explanation: string
+  count: number
+  submissionIds: string[]
+  tutorIds: string[]
+}
