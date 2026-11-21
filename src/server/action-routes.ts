@@ -36,6 +36,7 @@ import {
 } from 'deepspace/worker'
 import type { ActionResult, ActionTools, VerifyResult } from 'deepspace/worker'
 import { actions } from '../actions/index.js'
+import { testActions } from '../actions/test-fixtures.js'
 import { integrations } from '../integrations.js'
 import type { AppContext, Env } from '../../worker.js'
 
@@ -60,7 +61,11 @@ export function registerActionRoutes(app: Hono<AppContext>, resolveAuth: Resolve
     const name = c.req.param('name')
     // Own keys only: `actions[name]` also finds `constructor` (Object), which
     // returns the handler argument, env secrets included, as the response.
-    const action = lookupOwn(actions, name)
+    // Test-only fixture actions exist only where debug routes are enabled
+    // (`deepspace dev` / `deepspace test`), never on a deployed app.
+    const action =
+      lookupOwn(actions, name) ??
+      (c.env.ALLOW_DEBUG_ROUTES === 'true' ? lookupOwn(testActions, name) : undefined)
     if (!action) return c.json({ error: 'Action not found' }, 404)
     const params = await c.req.json<Record<string, unknown>>()
     const tools = createActionTools(c.env, auth.userId, callerJwt)
