@@ -51,7 +51,24 @@ Refs: `node_modules/deepspace/dist/schema.d.ts` (`CollectionSchema`, `ColumnDefi
   `openSession` / `joinSession` set those.
 - `create` takes a boolean only. `read`, `update` and `delete` take any `PermissionLevel`.
 
-## Q2. Does `generateText` via the DeepSpace AI factory return clean JSON, or use structured output? — **Spike pending**
+## Q2. Does `generateText` via the DeepSpace AI factory return clean JSON, or use structured output? — **Spike: both work; use `Output.object`**
+
+**Spike A result** (live app, 2026-11-21, `claude-haiku-5-5`, owner-billed, 4 fake wrong answers to
+d/dx sin(3x²)):
+
+| Mode | Result | Time |
+| --- | --- | --- |
+| `generateText({ output: Output.object({ schema }) })` | Schema-valid object, every ID present exactly once | 4.4 s |
+| Plain prompt "reply with only JSON", then `JSON.parse` + zod | Clean JSON text with no code fences; parsed and validated | 2.9 s |
+
+Structured output passes through the DeepSpace proxy. **Decision:** use `Output.object` for clustering,
+because the SDK then guarantees the shape. Keep the semantic zod checks in `src/lib/clusters.ts`:
+the structured run returned the label "Wrong sign: derivative of sin as negative cos" (**8 words**,
+over the ≤ 6 limit). The shape was valid but the rule wasn't met, so the "retry once, then fall back"
+path is needed. Labels came out sensible and close to what the doc expects ("Forgot chain rule
+inner derivative" for `cos(3x^2)`).
+
+Earlier notes:
 
 Refs: docs `/sdk-reference/worker/ai`; `node_modules/ai/dist/index.d.ts` (`generateText({ output })`,
 `Output.object({ schema })`).
@@ -141,7 +158,18 @@ Refs: docs `/guides/ai-chat` ("Install the chat feature", "Custom chat UI").
   is **world-readable**. Server code uses `appFiles(env, { scope, userId })`, max 25 MiB per request.
   The free plan has a 128 MiB total. For practice-set PDFs: store under the tutor's `'self'` scope;
   students download through a small participant-checked route (Phase 3 decision).
-- **Sandbox (Confirmed in types; Spike B pending):** `codeExecutionTool()`, `forwardSandboxContainer`,
+- **Sandbox — Spike B passed (live app, 2026-11-21):** an owner-billed background job ran
+  `claude-sonnet-5-5` with `codeExecutionTool()` and finished in **about 15 s**. It wrote
+  `practice-test.pdf` (23,664 bytes, `%PDF-1.4`, 1 page, made by matplotlib 3.10.5) to `$OUTPUT_DIR`.
+  The job downloaded it with `sandboxFiles`, saved it with
+  `appFiles(env, { scope: 'self', userId: OWNER })`, and deleted the sandbox copy. The PDF had the
+  title, a labelled correct-rate bar chart, and a practice problem with a correctly rendered exponent.
+  Evidence: the `[spike-sandbox-pdf] ok` log line and `npx deepspace app files get … --private`.
+  **API gotcha found:** `appFiles.download(key)` and `delete(key)` want the **full stored key**
+  (`apps/<app>/users/<id>/…`, the `key` that `upload()`/`list()` return). The short relative key
+  fails with `Access denied: key outside scope`, so the `key` from `upload()` is what goes on the
+  `practiceSets` row.
+- **Sandbox API (Confirmed in types):** `codeExecutionTool()`, `forwardSandboxContainer`,
   `sandboxOutputs(steps)`, `sandboxFiles(env).get/download/delete`. Use `streamText`, not
   `generateText`, to avoid a ~2-minute 524 timeout. Only files at the top level of `$OUTPUT_DIR` are
   exported. Needs a deploy first (`APP_IDENTITY_TOKEN`).
