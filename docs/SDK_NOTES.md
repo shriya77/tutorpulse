@@ -196,3 +196,15 @@ Refs: docs `/guides/ai-chat` ("Install the chat feature", "Custom chat UI").
 | `ChatPanel` is bundled | Installed by `add ai-chat`, with 5 Markdown dependencies | needs your approval in Phase 3 |
 | Hint assistant cost not specified | Scaffold chat bills the student | your decision in Phase 3 |
 | Notes up to 10 MB, storage 128 MiB | Confirmed 128 MiB free-plan quota | unchanged |
+
+## Verified in Phase 1 (T4, local)
+
+- Rows created through server action `tools.create` get `createdBy` = **the calling user** (the
+  `X-User-Id` the action route sends). That's how a session or answer key seeded by an action is
+  owned by the tutor who called it.
+- The RBAC-enforced agent tool route `/_deepspace/agent/browser/tools/<tool>` with a user's JWT
+  (from `POST /api/auth/token`) refuses forbidden reads and writes with HTTP 422 and
+  `READ DENIED: role=member, collection=…`. `records_query` silently filters out rows the caller
+  can't read. The caller needs a `users` row first: one app page visit creates it.
+- Test-account emails are global across all DeepSpace developers. Use a unique suffix.
+  `--password-stdin` only accepts a piped password.

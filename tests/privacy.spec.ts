@@ -64,9 +64,12 @@ async function query(who: Identity, collection: string, where: Record<string, un
 
 /** A refused tool call: non-2xx, ok:false, or an inner success:false. */
 function refused({ status, body }: { status: number; body: Record<string, unknown> }): boolean {
-  if (status >= 400 || body.ok === false) return true
   const result = body.result as Record<string, unknown> | undefined
-  return result?.success === false || (typeof result?.error === 'string' && result.error.length > 0)
+  const isRefused =
+    status >= 400 || body.ok === false || result?.success === false || (typeof result?.error === 'string' && result.error.length > 0)
+  // Surface why, so the report can show refusals are permission denials.
+  if (isRefused) console.log(`[T4] refused (${status}): ${JSON.stringify(body).slice(0, 200)}`)
+  return isRefused
 }
 
 async function action(who: Identity, name: string, params: Record<string, unknown>) {
@@ -96,6 +99,16 @@ test('T4: students cannot read other students’ work, the answer key, clusters,
     expect(await query(tutor, 'clusters', bySession)).toHaveLength(1)
     expect(await query(tutor, 'practiceSets', bySession)).toHaveLength(1)
     expect(await query(tutor, 'sessions', { recordId: ids.sessionId })).toHaveLength(1)
+    // The same call shapes the students are refused below DO work for the
+    // tutor, so a refusal means "not allowed", not "malformed request".
+    for (const recordId of [ids.submissionA, ids.submissionB]) {
+      expect(refused(await tool(tutor, 'records_get', { collection: 'submissions', recordId }))).toBe(false)
+    }
+    expect(refused(await tool(tutor, 'records_get', { collection: 'answerKeys', recordId: ids.answerKeyId }))).toBe(false)
+    expect(refused(await tool(tutor, 'records_get', { collection: 'clusters', recordId: ids.clusterId }))).toBe(false)
+    expect(
+      refused(await tool(tutor, 'records_update', { collection: 'sessions', recordId: ids.sessionId, data: { focusLabel: 'x' } })),
+    ).toBe(false)
 
     for (const [me, other, mySubmission, otherSubmission] of [
       [studentA, studentB, ids.submissionA, ids.submissionB],
