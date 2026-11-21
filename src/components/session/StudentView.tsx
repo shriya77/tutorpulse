@@ -7,27 +7,50 @@
  */
 
 import { useEffect, useState, type FormEvent } from 'react'
-import { useQuery } from 'deepspace'
+import { usePresenceRoom, useQuery } from 'deepspace'
 import { Button, Input, Label } from '@/components/ui'
 import type { Envelope, SessionData, SubmissionData } from '../../actions/types'
 import { useSessionProblems } from '../../hooks/useSessionData'
 import { callAction } from '../../lib/callAction'
 import { MathText } from '../MathText'
+import { PracticeSetLink } from './PracticeSetLink'
+
+/** What a student shares with the tutor's live roster (F10). Ephemeral, never stored. */
+export interface StudentPresence {
+  problemId: string | null
+  submitted: boolean
+  stuck: boolean
+}
 
 export function StudentView({ session }: { session: Envelope<SessionData> }) {
   const { problems, status } = useSessionProblems(session.recordId, session.createdBy)
+  // RBAC returns only this student's own submissions.
+  const { records: mySubmissions } = useQuery<SubmissionData>('submissions', { where: { sessionId: session.recordId } })
+  const [stuck, setStuck] = useState(false)
+  const { connected, updateState } = usePresenceRoom(`session:${session.recordId}`)
+
+  const index = problems.findIndex((p) => p.recordId === session.data.currentProblemId)
+  const problem = problems[index]
+  const mine = problem ? mySubmissions.find((s) => s.data.problemId === problem.recordId) : undefined
+  const presence: StudentPresence = { problemId: problem?.recordId ?? null, submitted: !!mine, stuck }
+
+  // Re-send whenever it changes AND after every reconnect (a reconnect clears our state).
+  useEffect(() => {
+    if (connected) updateState({ ...presence })
+  }, [connected, presence.problemId, presence.submitted, presence.stuck])
+
+  // A new problem starts un-stuck.
+  useEffect(() => setStuck(false), [problem?.recordId])
 
   if (session.data.status === 'closed') {
     return (
       <div className="rounded-xl border border-border bg-card p-6 text-center">
         <p className="text-lg font-medium text-foreground">This session has ended.</p>
         <p className="mt-1 text-sm text-muted-foreground">Thanks for taking part.</p>
+        <PracticeSetLink sessionId={session.recordId} />
       </div>
     )
   }
-
-  const index = problems.findIndex((p) => p.recordId === session.data.currentProblemId)
-  const problem = problems[index]
 
   return (
     <div className="space-y-5">
@@ -44,16 +67,41 @@ export function StudentView({ session }: { session: Envelope<SessionData> }) {
           Waiting for your tutor to show a problem…
         </div>
       ) : (
-        <AnswerCard key={problem.recordId} problemId={problem.recordId} number={index + 1} prompt={problem.data.prompt} locked={problem.data.status === 'locked'} />
+        <>
+          <AnswerCard
+            key={problem.recordId}
+            problemId={problem.recordId}
+            number={index + 1}
+            prompt={problem.data.prompt}
+            locked={problem.data.status === 'locked'}
+            mine={mine}
+            onSubmitted={() => setStuck(false)}
+          />
+          <Button
+            type="button"
+            variant={stuck ? 'secondary' : 'outline'}
+            aria-pressed={stuck}
+            onClick={() => setStuck((v) => !v)}
+            data-testid="stuck-button"
+          >
+            {stuck ? 'Tutor notified — tap if you’re unstuck' : 'I’m stuck'}
+          </Button>
+        </>
       )}
     </div>
   )
 }
 
-function AnswerCard({ problemId, number, prompt, locked }: { problemId: string; number: number; prompt: string; locked: boolean }) {
-  // RBAC returns only this student's own submission.
-  const { records } = useQuery<SubmissionData>('submissions', { where: { problemId } })
-  const mine = records[0]
+function AnswerCard({
+  problemId, number, prompt, locked, mine, onSubmitted,
+}: {
+  problemId: string
+  number: number
+  prompt: string
+  locked: boolean
+  mine?: Envelope<SubmissionData>
+  onSubmitted: () => void
+}) {
   const [answer, setAnswer] = useState('')
   const [explanation, setExplanation] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -76,6 +124,7 @@ function AnswerCard({ problemId, number, prompt, locked }: { problemId: string; 
     const r = await callAction<{ revision: number }>('submitAnswer', { problemId, answer, explanation })
     setBusy(false)
     if (!r.ok) setError(r.error)
+    else onSubmitted()
   }
 
   return (

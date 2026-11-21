@@ -14,6 +14,8 @@ import { callAction } from '../../lib/callAction'
 import { OTHER_LABEL } from '../../lib/clusters'
 import { MathText } from '../MathText'
 import { ProblemEditor } from './ProblemEditor'
+import { PracticeSetPanel } from './PracticeSetPanel'
+import { TutorRoster } from './TutorRoster'
 
 export function TutorView({ session }: { session: Envelope<SessionData> }) {
   const { problems, status } = useSessionProblems(session.recordId, session.createdBy)
@@ -34,6 +36,8 @@ export function TutorView({ session }: { session: Envelope<SessionData> }) {
   return (
     <div className="space-y-6">
       <LiveHeader session={session} />
+      {session.data.status === 'closed' && <PracticeSetPanel session={session} />}
+      {session.data.status === 'open' && <TutorRoster session={session} problems={problems} />}
       <Board session={session} problems={problems} />
       <section className="space-y-3">
         <Button variant="outline" size="sm" onClick={() => setEditing((v) => !v)} aria-expanded={editing}>
@@ -96,11 +100,29 @@ function LiveHeader({ session }: { session: Envelope<SessionData> }) {
         </p>
       </div>
       {live && (
-        <Button variant="destructive" onClick={end} disabled={busy}>
-          End session
-        </Button>
+        <div className="flex flex-col items-stretch gap-2 sm:items-end">
+          {session.data.focusLabel && (
+            <div className="flex items-center gap-2 text-sm" data-testid="on-board">
+              <span className="text-muted-foreground">On the board:</span>
+              <span className="font-medium text-foreground">{session.data.focusLabel}</span>
+              <ClearBoardButton sessionId={session.recordId} />
+            </div>
+          )}
+          <Button variant="destructive" onClick={end} disabled={busy}>
+            End session
+          </Button>
+        </div>
       )}
     </div>
+  )
+}
+
+function ClearBoardButton({ sessionId }: { sessionId: string }) {
+  const sessions = useMutations<Partial<SessionData>>('sessions')
+  return (
+    <Button size="sm" variant="ghost" disabled={!sessions.ready} onClick={() => sessions.put(sessionId, { focusLabel: '' })}>
+      Clear
+    </Button>
   )
 }
 
@@ -135,6 +157,11 @@ function Board({ session, problems }: { session: Envelope<SessionData>; problems
     return m
   }, [clusters])
 
+  const submissionById = useMemo(
+    () => new Map((submissions as Envelope<SubmissionData>[]).map((s) => [s.recordId, s])),
+    [submissions],
+  )
+
   return (
     <ol className="space-y-4" aria-label="Misconception radar">
       {problems.map((p, i) => (
@@ -145,6 +172,7 @@ function Board({ session, problems }: { session: Envelope<SessionData>; problems
             session={session}
             stats={stats.get(p.recordId) ?? { submitted: 0, correct: 0, needsReview: 0 }}
             clusters={clustersByProblem.get(p.recordId) ?? []}
+            submissionById={submissionById}
           />
         </li>
       ))}
@@ -153,13 +181,14 @@ function Board({ session, problems }: { session: Envelope<SessionData>; problems
 }
 
 function ProblemBoardCard({
-  index, problem, session, stats, clusters,
+  index, problem, session, stats, clusters, submissionById,
 }: {
   index: number
   problem: Envelope<ProblemData>
   session: Envelope<SessionData>
   stats: ProblemStats
   clusters: Envelope<ClusterData>[]
+  submissionById: Map<string, Envelope<SubmissionData>>
 }) {
   const sessions = useMutations<Partial<SessionData>>('sessions')
   const problems = useMutations<Partial<ProblemData>>('problems')
@@ -212,15 +241,13 @@ function ProblemBoardCard({
         ) : (
           <ul className="space-y-2" data-testid="cluster-list">
             {clusters.map((c) => (
-              <li key={c.recordId} className="rounded-lg border border-border px-3 py-2" data-testid="cluster">
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="font-medium text-foreground" data-testid="cluster-label">{c.data.label}</span>
-                  <span className="font-mono text-lg font-semibold text-foreground" data-testid="cluster-count" aria-label={`${c.data.count} students`}>
-                    {c.data.count}
-                  </span>
-                </div>
-                {c.data.explanation && <p className="mt-0.5 text-sm text-muted-foreground">{c.data.explanation}</p>}
-              </li>
+              <ClusterItem
+                key={c.recordId}
+                cluster={c}
+                session={session}
+                live={live}
+                submissionById={submissionById}
+              />
             ))}
           </ul>
         )}
@@ -235,5 +262,66 @@ function Stat({ label, value, testId }: { label: string; value: number; testId: 
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="font-mono text-2xl font-semibold text-foreground" data-testid={testId}>{value}</dd>
     </div>
+  )
+}
+
+/**
+ * One misconception cluster (F11, F12). "Show answers" lists the anonymized
+ * answers behind it (answer + explanation, no names). "Take to board" puts
+ * its label on every student's screen.
+ */
+function ClusterItem({
+  cluster, session, live, submissionById,
+}: {
+  cluster: Envelope<ClusterData>
+  session: Envelope<SessionData>
+  live: boolean
+  submissionById: Map<string, Envelope<SubmissionData>>
+}) {
+  const sessions = useMutations<Partial<SessionData>>('sessions')
+  const [open, setOpen] = useState(false)
+  const onBoard = session.data.focusLabel === cluster.data.label
+  const answers = (cluster.data.submissionIds ?? [])
+    .map((id) => submissionById.get(id))
+    .filter((s): s is Envelope<SubmissionData> => !!s)
+  const panelId = `cluster-answers-${cluster.recordId}`
+
+  return (
+    <li className={`rounded-lg border px-3 py-2 ${onBoard ? 'border-info bg-info/10' : 'border-border'}`} data-testid="cluster">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="font-medium text-foreground" data-testid="cluster-label">{cluster.data.label}</span>
+        <span className="font-mono text-lg font-semibold text-foreground" data-testid="cluster-count" aria-label={`${cluster.data.count} students`}>
+          {cluster.data.count}
+        </span>
+      </div>
+      {cluster.data.explanation && <p className="mt-0.5 text-sm text-muted-foreground">{cluster.data.explanation}</p>}
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Button size="sm" variant="ghost" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((v) => !v)} data-testid="cluster-toggle">
+          {open ? 'Hide answers' : `Show answers (${answers.length})`}
+        </Button>
+        {live && (
+          <Button
+            size="sm"
+            variant={onBoard ? 'secondary' : 'outline'}
+            disabled={!sessions.ready}
+            onClick={() => sessions.put(session.recordId, { focusLabel: onBoard ? '' : cluster.data.label })}
+            data-testid="take-to-board"
+          >
+            {onBoard ? 'Remove from board' : 'Take to board'}
+          </Button>
+        )}
+      </div>
+      {open && (
+        <ul id={panelId} className="mt-2 space-y-1 border-t border-border pt-2" data-testid="cluster-answers">
+          {answers.length === 0 && <li className="text-sm text-muted-foreground">These answers were revised.</li>}
+          {answers.map((s) => (
+            <li key={s.recordId} className="text-sm">
+              <code className="font-mono text-foreground">{s.data.answer}</code>
+              {s.data.explanation && <span className="text-muted-foreground"> — “{s.data.explanation}”</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
   )
 }
