@@ -13,6 +13,7 @@ export const settingsSchema: CollectionSchema = {
     { name: 'value', storage: 'text', interpretation: 'plain' },
   ],
   permissions: {
+    '*': { read: false, create: false, update: false, delete: false },
     viewer: { read: false, create: false, update: false, delete: false },
     member: { read: false, create: false, update: false, delete: false },
     admin: { read: true, create: true, update: true, delete: true },
