@@ -68,13 +68,18 @@ export class AppCronRoom extends CronRoom<Env> {
 /** Runs durable background work defined in src/jobs.ts. */
 export class AppJobRoom extends JobRoom<Env> {
   constructor(state: DurableObjectState, env: Env) {
-    super(state, env, {
-      authorizeWrite: async (user) => {
-        if (user.userId.startsWith('anon-')) return false
-        const role = await resolveAppRole(env, user.userId)
-        return role === 'member' || role === 'admin'
-      },
-    })
+    // TutorPulse jobs (clustering, practice sets) spend the owner's AI credits
+    // and their rows carry session ids and results. So neither students nor
+    // tutors touch the queue over the socket: jobs are enqueued only by server
+    // actions via `enqueueJob` (an internal DO request, not subject to these
+    // checks), which enforce the per-session caps. Tutors see progress through
+    // records (`problems.clusterState`, `practiceSets.progressMessage`).
+    // Default read access mirrors write access, so set both explicitly.
+    const adminOnly = async (user: { userId: string }) => {
+      if (user.userId.startsWith('anon-')) return false
+      return (await resolveAppRole(env, user.userId)) === 'admin'
+    }
+    super(state, env, { authorizeWrite: adminOnly, authorizeRead: adminOnly })
   }
 
   protected async onJob(job: Job, context: JobContext): Promise<unknown> {
