@@ -43,6 +43,8 @@ import type { Job, JobContext } from 'deepspace/worker'
 import type { Env } from '../worker'
 import { CLUSTER_JOB, type ClusterJobPayload } from './actions/clustering-trigger'
 import { runClusterJob } from './jobs/cluster-problem'
+import { PRACTICE_SET_JOB, type PracticeSetJobPayload } from './actions/practice-set-actions'
+import { runPracticeSetJob } from './jobs/practice-set'
 
 /**
  * Jobs are enqueued only by server actions (the job room is admin-only), so
@@ -53,6 +55,8 @@ export async function runJob(job: Job, ctx: JobContext, env: Env): Promise<unkno
   switch (job.type) {
     case CLUSTER_JOB:
       return await runClusterJob(job.payload as ClusterJobPayload, ctx, env)
+    case PRACTICE_SET_JOB:
+      return await runPracticeSetJob(job.payload as PracticeSetJobPayload, ctx, env)
     default:
       throw new Error(`Unknown job type: ${job.type}`)
   }

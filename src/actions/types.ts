@@ -60,3 +60,14 @@ export type ClusterData = {
   submissionIds: string[]
   tutorIds: string[]
 }
+
+export type PracticeSetStatus = 'generating' | 'ready' | 'published' | 'failed'
+
+export type PracticeSetData = {
+  sessionId: string
+  tutorId: string
+  status: PracticeSetStatus
+  progressMessage?: string
+  fileKey?: string
+  participantIds: string[]
+}

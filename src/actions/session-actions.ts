@@ -8,6 +8,7 @@ import type { ActionHandler } from 'deepspace/worker'
 import type { Env } from '../../worker'
 import { generateJoinCode, normalizeJoinCode } from '../lib/joinCode'
 import { requireTutor } from './guards'
+import { startPracticeSet } from './practice-set-actions'
 import type { Envelope, ProblemData, SessionData } from './types'
 
 /** Tutor opens a draft session: assigns a unique join code and points students at problem 1. */
@@ -44,13 +45,21 @@ export const openSession: ActionHandler<Env> = async (ctx) => {
   return { success: true, data: { joinCode } }
 }
 
-/** Tutor ends the session: no more joins or submissions. */
+/**
+ * Tutor ends the session: no more joins or submissions, and (Flow E) the
+ * practice set starts generating if anyone took part.
+ */
 export const closeSession: ActionHandler<Env> = async (ctx) => {
   const g = await requireTutor(ctx, ctx.params.sessionId, { statuses: ['open', 'draft'] })
   if (!g.ok) return { success: false, error: g.error }
   const res = await ctx.tools.update('sessions', g.session.recordId, { status: 'closed', focusLabel: '' })
   if (!res.success) return { success: false, error: 'Could not close the session' }
-  return { success: true, data: { sessionId: g.session.recordId } }
+  const hadStudents = (g.session.data.participantIds?.length ?? 0) > 0
+  const practice = hadStudents ? await startPracticeSet(ctx.env, ctx.tools, g.session) : null
+  return {
+    success: true,
+    data: { sessionId: g.session.recordId, practiceSetId: practice?.ok ? practice.practiceSetId : null },
+  }
 }
 
 const NO_SESSION = 'No open session with that code'
