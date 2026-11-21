@@ -4,12 +4,36 @@ import react from '@vitejs/plugin-react'
 import generouted from '@generouted/react-router/plugin'
 import { cloudflare } from '@cloudflare/vite-plugin'
 import checker from 'vite-plugin-checker'
+import { deepspaceBuild } from 'deepspace/build'
+import { prerender } from './prerender.ts'
+
+const appDir = fileURLToPath(new URL('.', import.meta.url))
 
 export default defineConfig({
   plugins: [
     react(),
     generouted(),
-    cloudflare(),
+    // The Cloudflare plugin otherwise searches for a free inspector port by
+    // enumerating every network interface. Restricted agent containers can
+    // reject that OS call (`uv_interface_addresses`) even when loopback is
+    // available. Inspector debugging is optional, so disable that probe in
+    // the generated app and keep local dev/test startup deterministic.
+    cloudflare({
+      inspectorPort: false,
+    }),
+    // The app id `define`, the preview-secret cleanup, and the client dedupe
+    // hint — all shipped by the SDK so a fix to any of them arrives with a
+    // version bump, not an app edit. The app id is read from the wrangler
+    // config THIS build targets (wrangler.toml, or the env-flattened config
+    // `deepspace deploy --env` generates); src/constants.ts is the only
+    // consumer.
+    deepspaceBuild({ appDir }),
+    // Prerenders the public pages listed in src/prerender-entry.tsx into static
+    // HTML at `vite build`, stamps their <Seo> head, and writes sitemap.xml plus
+    // the robots.txt Sitemap line from src/seo.ts — so crawlers that do not run
+    // JavaScript read real content. See prerender.ts; delete this line for a
+    // plain SPA.
+    prerender(),
     // Runs the Rules of Hooks lint (see eslint.config.js) automatically, so
     // there's no separate step to remember: a violation surfaces as an overlay
     // during `deepspace dev start` and fails the build during `deepspace deploy`.
@@ -26,7 +50,6 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
-    dedupe: ['react', 'react-dom', 'better-auth'],
   },
   optimizeDeps: {
     // generouted loads routes via `import.meta.glob`, which Vite's esbuild dep-scanner

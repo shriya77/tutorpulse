@@ -7,9 +7,21 @@
 
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import { CanvasRoom, CronRoom, JobRoom, PresenceRoom, RecordRoom, YjsRoom } from 'deepspace/worker'
+import {
+  armCronRoom,
+  CanvasRoom,
+  CronRoom,
+  JobRoom,
+  PresenceRoom,
+  RecordRoom,
+  resolveAppRole,
+  workerErrorHandler,
+  YjsRoom,
+} from 'deepspace/worker'
 import type { DOBindings, DOManifest, Job, JobContext } from 'deepspace/worker'
-import { registerAiChatRoutes } from './src/ai/chat-routes.js'
+import { AI_CHATS_SCHEMA } from 'deepspace/schema'
+import { registerAgent } from './src/ai/agent.js'
+import { buildTools } from './src/ai/tools.js'
 import { tasks as cronTasks, runTask as runCronTask } from './src/cron.js'
 import { runJob } from './src/jobs.js'
 import { schemas } from './src/schemas.js'
@@ -56,7 +68,13 @@ export class AppCronRoom extends CronRoom<Env> {
 /** Runs durable background work defined in src/jobs.ts. */
 export class AppJobRoom extends JobRoom<Env> {
   constructor(state: DurableObjectState, env: Env) {
-    super(state, env)
+    super(state, env, {
+      authorizeWrite: async (user) => {
+        if (user.userId.startsWith('anon-')) return false
+        const role = await resolveAppRole(env, user.userId)
+        return role === 'member' || role === 'admin'
+      },
+    })
   }
 
   protected async onJob(job: Job, context: JobContext): Promise<unknown> {
@@ -84,6 +102,8 @@ export interface Env extends DOBindings<typeof __DO_MANIFEST__> {
   AUTH_JWT_PUBLIC_KEY: string
   AUTH_JWT_ISSUER: string
   AUTH_WORKER_URL: string
+  /** Comma-separated exact Expo/native callback URIs (for example, myapp://auth/callback). */
+  NATIVE_AUTH_REDIRECT_URIS?: string
   APP_NAME: string
   /** Immutable record-scope and platform identity. */
   DEEPSPACE_APP_ID: string
@@ -94,8 +114,8 @@ export interface Env extends DOBindings<typeof __DO_MANIFEST__> {
    */
   APP_OWNER_JWT: string
   /**
-   * Enables the unauthenticated /api/debug/* proxy only when exactly "true".
-   * deepspace dev/test set it locally; deployed environments must opt in.
+   * Enables /api/debug/* only when exactly "true". The route still requires
+   * an authenticated app owner/admin. deepspace dev/test set it locally.
    */
   ALLOW_DEBUG_ROUTES?: string
 }
@@ -104,14 +124,34 @@ export type AppContext = { Bindings: Env }
 
 const app = new Hono<AppContext>()
 app.use('/api/*', cors())
+// A Durable Object exists only once something fetches it, and the CronRoom
+// arms its alarm in that first fetch — so wake it from the request path, or a
+// deployed schedule waits for a visitor. Once per isolate; no-op without tasks.
+app.use('*', async (c, next) => {
+  armCronRoom(c.executionCtx, c.env.CRON_ROOMS, `app:${c.env.DEEPSPACE_APP_ID}`, cronTasks)
+  await next()
+})
 
 // Registration order is part of the worker contract. The wildcard auth route
 // follows its special cases, AI precedes platform proxies, and static is last.
 registerAuthAndIntegrationRoutes(app)
 registerRealtimeRoutes(app)
 registerActionRoutes(app, resolveAuth)
-registerAiChatRoutes(app, resolveAuth)
+// Every scaffold exposes selected tools through HTTP, MCP and browser tools.
+// Only copilot owns the collections needed for the in-app chat UI.
+registerAgent(app, {
+  tools: buildTools,
+  inApp: schemas.some((schema) => schema.name === AI_CHATS_SCHEMA.name),
+})
 registerPlatformProxyRoutes(app)
 registerStaticRoutes(app)
+
+// Hono registers ONE error handler (last onError wins), and its default is
+// `console.error(err)` — whose message Workers Logs drops, keeping only the
+// stack frames. workerErrorHandler logs the string form instead (message
+// first, frames and bounded cause chain, method + path for context), keeps a
+// response-bearing error's (HTTPException — auth 401s, upload 413s) own
+// answer, and returns a generic 500 for the rest.
+app.onError(workerErrorHandler('error'))
 
 export default app

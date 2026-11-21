@@ -1,13 +1,14 @@
 /**
  * WebSocket routing for app-owned Durable Objects.
  *
- * Caller identity in query parameters is never trusted. Generic routes scrub
- * it and derive identity from a verified JWT; the documents-aware Yjs route
- * additionally resolves an application role from the documents collection.
+ * Caller identity in query parameters and headers is never trusted. Routes
+ * scrub it and forward verified JWT identity in internal-only headers; the
+ * documents-aware Yjs route additionally resolves an application role from
+ * the documents collection.
  */
 
 import type { Context, Hono } from 'hono'
-import { verifyJwt } from 'deepspace/worker'
+import { authenticatedRoomRequest, resolveAppRole, verifyJwt } from 'deepspace/worker'
 import type { JwtVerifierConfig, VerifyResult } from 'deepspace/worker'
 import type { AppContext, Env } from '../../worker.js'
 
@@ -15,36 +16,9 @@ function jwtConfig(env: Env): JwtVerifierConfig {
   return { publicKey: env.AUTH_JWT_PUBLIC_KEY, issuer: env.AUTH_JWT_ISSUER }
 }
 
-const IDENTITY_QUERY_PARAMS = ['userId', 'userName', 'userEmail', 'userImageUrl', 'role'] as const
-
-function authenticatedRoomUrl(
-  requestUrl: string,
-  auth: VerifyResult | null,
-  extraParams?: (auth: VerifyResult) => Record<string, string>,
-): URL {
-  const doUrl = new URL(requestUrl)
-  doUrl.searchParams.delete('token')
-  for (const key of IDENTITY_QUERY_PARAMS) {
-    doUrl.searchParams.delete(key)
-  }
-
-  if (!auth) return doUrl
-
-  doUrl.searchParams.set('userId', auth.userId)
-  if (auth.claims.name) doUrl.searchParams.set('userName', auth.claims.name)
-  if (auth.claims.email) doUrl.searchParams.set('userEmail', auth.claims.email)
-  if (auth.claims.image) doUrl.searchParams.set('userImageUrl', auth.claims.image)
-  if (extraParams) {
-    for (const [key, value] of Object.entries(extraParams(auth))) {
-      doUrl.searchParams.set(key, value)
-    }
-  }
-  return doUrl
-}
-
 function wsRoute(
   doNamespace: (env: Env) => DurableObjectNamespace,
-  extraParams?: (auth: VerifyResult) => Record<string, string>,
+  extraIdentity?: (auth: VerifyResult, env: Env) => { role?: string } | Promise<{ role?: string }>,
 ) {
   return async (c: Context<AppContext>) => {
     const id = c.req.param('roomId') ?? c.req.param('docId') ?? c.req.param('scopeId')
@@ -57,12 +31,15 @@ function wsRoute(
       auth = (await verifyJwt(jwtConfig(c.env), token)).result
       if (!auth) return new Response('Unauthorized', { status: 401 })
     }
-
-    const doUrl = authenticatedRoomUrl(c.req.url, auth, extraParams)
+    const roomRequest = authenticatedRoomRequest(
+      c.req.raw,
+      auth,
+      auth ? await extraIdentity?.(auth, c.env) : undefined,
+    )
 
     const namespace = doNamespace(c.env)
     const stub = namespace.get(namespace.idFromName(id))
-    return stub.fetch(new Request(doUrl.toString(), c.req.raw))
+    return stub.fetch(roomRequest)
   }
 }
 
@@ -114,10 +91,7 @@ async function getDocumentForAccess(env: Env, docId: string): Promise<DocumentAc
     if (json.success && json.data?.record?.data) {
       return { kind: 'found', doc: json.data.record.data }
     }
-    if (
-      json.error === 'Record not found' ||
-      json.error?.startsWith('Schema not registered for collection: documents')
-    ) {
+    if (json.error?.startsWith('Schema not registered for collection: documents')) {
       return { kind: 'not-docs-room' }
     }
     return { kind: 'error' }
@@ -162,23 +136,22 @@ export function registerRealtimeRoutes(app: Hono<AppContext>): void {
     const role = await resolveDocsYjsRole(c.env, docId, auth.userId)
     if (!role) return new Response('Forbidden', { status: 403 })
 
-    const doUrl = authenticatedRoomUrl(c.req.url, auth, () => ({ role }))
+    const roomRequest = authenticatedRoomRequest(c.req.raw, auth, { role })
 
     const stub = c.env.YJS_ROOMS.get(c.env.YJS_ROOMS.idFromName(docId))
-    return stub.fetch(new Request(doUrl.toString(), c.req.raw))
+    return stub.fetch(roomRequest)
   })
 
   app.get(
     '/ws/canvas/:docId',
     wsRoute(
       (env) => env.CANVAS_ROOMS,
-      () => ({ role: 'member' }),
+      async (auth, env) => ({ role: await resolveAppRole(env, auth.userId) }),
     ),
   )
 
   app.get(
     '/ws/presence/:scopeId',
-    // name/email/image are already forwarded for every authenticated room.
     wsRoute((env) => env.PRESENCE_ROOMS),
   )
 
@@ -186,9 +159,9 @@ export function registerRealtimeRoutes(app: Hono<AppContext>): void {
     '/ws/cron/:roomId',
     wsRoute(
       (env) => env.CRON_ROOMS,
-      // Authenticated users can trigger/pause/resume. Anonymous connections
+      // Authenticated users get their current app role. Anonymous connections
       // have no role and CronRoom enforces them as read-only viewers.
-      () => ({ role: 'member' }),
+      async (auth, env) => ({ role: await resolveAppRole(env, auth.userId) }),
     ),
   )
 

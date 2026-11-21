@@ -18,15 +18,18 @@
 import { Suspense, type ReactNode } from 'react'
 import { Outlet } from 'react-router-dom'
 import { DeepSpaceAuthProvider, useAuthStatus } from 'deepspace'
-import { RecordProvider, RecordScope } from 'deepspace'
+import { RecordProvider, RecordScope, AgentTools } from 'deepspace'
 import Navigation from '../../components/Navigation'
 import { useToast } from '@/components/ui'
-import { SCOPE_ID } from '../../constants'
+import { APP_NAME, SCOPE_ID } from '../../constants'
 import { schemas } from '../../schemas'
 
 export default function AppLayout() {
   return (
     <DeepSpaceAuthProvider>
+      {/* The prerendered landing owns the document <title> and React drops it
+          when <Seo> unmounts, so every route without <Seo> sets its own. */}
+      <title>{APP_NAME}</title>
       <AuthBoot>
         <div className="flex h-screen flex-col bg-background overflow-hidden">
           <Navigation />
@@ -52,7 +55,7 @@ export default function AppLayout() {
  */
 function AuthBoot({ children }: { children: ReactNode }) {
   const { isLoaded } = useAuthStatus()
-  // Record writes (`create`/`put`/`remove`) are optimistic — they resolve
+  // Record writes (`create`/`put`/`remove`) are fire-and-forget — they resolve
   // before the server answers, so a denied or invalid write only surfaces
   // through onWriteError. Route rejections to toasts so they're never a
   // silent no-op. Keep this wiring when customizing the layout.
@@ -70,6 +73,7 @@ function AuthBoot({ children }: { children: ReactNode }) {
       }
     >
       <RecordScope roomId={SCOPE_ID} schemas={schemas}>
+        <AgentTools />
         {children}
       </RecordScope>
     </RecordProvider>

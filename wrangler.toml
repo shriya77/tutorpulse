@@ -29,6 +29,9 @@ run_worker_first = ["/api/*", "/ws/*", "/internal/*", "/v1/*", "/_deepspace/*", 
 [vars]
 DEEPSPACE_APP_ID = "app_01M7ZP8D6VYFGEZXFVEZ2HX5YS"
 APP_NAME = "tutorpulse"
+# Exact comma-separated native callback URIs. Set this before deploying an
+# Expo client, for example: "myapp://auth/callback".
+NATIVE_AUTH_REDIRECT_URIS = ""
 
 [[migrations]]
 tag = "v1"
@@ -44,16 +47,25 @@ bindings = [
   { name = "JOB_ROOMS", class_name = "AppJobRoom" },
 ]
 
-# For per-app resources (D1, KV, Vectorize, R2, Queues), set the id field to
-# "auto" — DeepSpace provisions and tears down with the deploy. Example:
+# For per-app resources (D1, KV, Vectorize, R2, Queues, AI Search), set the id
+# field to "auto" — DeepSpace provisions and tears down with the deploy.
+# Example:
 #
 # [[d1_databases]]
 # binding = "MY_DB"
 # database_name = "my-app-db"
 # database_id = "auto"
 #
-# Full reference (all binding types + companion fields):
-#   https://docs.deep.space
+# One managed knowledge base per app — upload documents, then search them with
+# `knowledge(env)` from deepspace/worker. The instance is never exposed on env;
+# the binding name is only the provisioning key:
+#
+# [[ai_search]]
+# binding = "KNOWLEDGE"
+# instance_name = "auto"
+#
+# Full reference, behavior, and pricing:
+#   https://docs.deep.space/bindings/knowledge
 
 # --- DeepSpace detected secrets (names only; values live in `npx deepspace secrets`) ---
 #   (none declared)

@@ -7,6 +7,8 @@ dist
 .deepspace
 .worker-bundle.js
 *.tgz
+test-results/
+playwright-report/
 src/router.ts
 src/modals.tsx
 .claude/launch.json

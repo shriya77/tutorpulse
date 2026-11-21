@@ -8,7 +8,7 @@
  * The auth + realtime data layer lives one level down, in (app)/_layout.tsx.
  * Any page that needs `useAuth`, `useQuery`, `useMutations`, etc. must live
  * under src/pages/(app)/ (or (app)/(protected)/ to also require sign-in).
- * See the deepspace skill's references/auth.md § "Mixed (default)".
+ * See https://docs.deep.space/guides/authentication § "Mixed (default)".
  *
  * ToastProvider is local UI state (src/components/ui), not a network surface,
  * so it's safe to mount here for every page.
@@ -48,4 +48,13 @@ export default function App() {
 export function Catch() {
   const error = useRouteError()
   return <ErrorScreen error={error} />
+}
+
+/** Root fallback shown while Generouted loads the first lazy route module. */
+export function HydrateFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+      Loading...
+    </div>
+  )
 }
