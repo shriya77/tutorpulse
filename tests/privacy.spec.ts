@@ -64,6 +64,8 @@ async function query(who: Identity, collection: string, where: Record<string, un
 
 /** A refused tool call: non-2xx, ok:false, or an inner success:false. */
 function refused({ status, body }: { status: number; body: Record<string, unknown> }): boolean {
+  // A missing tool is a broken test, not a permission denial.
+  expect(body.code, 'tool must exist for a refusal to mean anything').not.toBe('tool_not_found')
   const result = body.result as Record<string, unknown> | undefined
   const isRefused =
     status >= 400 || body.ok === false || result?.success === false || (typeof result?.error === 'string' && result.error.length > 0)

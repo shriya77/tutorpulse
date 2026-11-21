@@ -2,10 +2,13 @@
  * AI tools for the in-app hint assistant and the local agent (one definition
  * for both surfaces, registered once via `registerAgent` in worker.ts).
  *
- * TutorPulse's assistant is READ-ONLY: write tools are left out of
- * ALLOWED_TOOL_NAMES, and the built-in read tools run as the calling user, so
- * per-collection RBAC still decides what they return (a student gets no
- * answer keys, clusters or other students' submissions — see T4).
+ * The in-app HINT ASSISTANT (/api/ai/chat) is READ-ONLY: it only gets
+ * READ_TOOL_NAMES. The browser/CLI agent surfaces (/_deepspace/agent/*) also
+ * get the record write tools; they run as the calling user under the same
+ * per-collection RBAC as that user's own WebSocket writes, so they add no
+ * power, and the privacy tests (T4, T5) use them to prove forbidden writes
+ * are refused. Every tool runs as the caller, so RBAC decides what it sees
+ * (a student gets no answer keys, clusters or other students' work).
  *
  * Two custom tools ground hints in the live session: `get_current_problem`
  * and `search_notes`. Neither takes a session id: the server derives the
@@ -23,8 +26,14 @@ import { findActiveSession, queryRecords } from '../server/owner-records'
 
 type ToolExecutor = (toolName: string, params: Record<string, unknown>) => Promise<unknown>
 
-// Read-only on purpose: no records.create / update / delete (F13).
-const ALLOWED_TOOL_NAMES = ['schema.list', 'schema.describe', 'records.query', 'records.get', 'user.current']
+const READ_TOOL_NAMES = ['schema.list', 'schema.describe', 'records.query', 'records.get', 'user.current']
+const WRITE_TOOL_NAMES = ['records.create', 'records.update', 'records.delete']
+
+/** The hint assistant's chat route never gets write tools (F13). */
+function isHintChat(context?: AgentToolContext<Env>): boolean {
+  if (!context) return true // no request context: be conservative
+  return new URL(context.request.url).pathname.startsWith('/api/ai/')
+}
 
 // ============================================================================
 // Tool definitions
@@ -32,9 +41,10 @@ const ALLOWED_TOOL_NAMES = ['schema.list', 'schema.describe', 'records.query', '
 
 export function buildTools(executor: ToolExecutor, context?: AgentToolContext<Env>): ToolSet {
   const tools: ToolSet = context ? buildHintTools(context) : {}
+  const allowed = isHintChat(context) ? READ_TOOL_NAMES : [...READ_TOOL_NAMES, ...WRITE_TOOL_NAMES]
 
   for (const def of BUILT_IN_TOOLS) {
-    if (!ALLOWED_TOOL_NAMES.includes(def.name)) continue
+    if (!allowed.includes(def.name)) continue
     const safeName = def.name.replace('.', '_')
     tools[safeName] = tool({
       description: def.description,
