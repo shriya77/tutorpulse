@@ -43,6 +43,30 @@ function wsRoute(
   }
 }
 
+/** True when the user is the session's tutor (creator) or a joined student. */
+export async function isSessionMember(env: Env, sessionId: string, userId: string): Promise<boolean> {
+  const stub = env.RECORD_ROOMS.get(env.RECORD_ROOMS.idFromName(`app:${env.DEEPSPACE_APP_ID}`))
+  try {
+    const res = await stub.fetch(
+      new Request('https://internal/api/tools/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-User-Id': env.OWNER_USER_ID, 'X-App-Action': 'true' },
+        body: JSON.stringify({ tool: 'records.get', params: { collection: 'sessions', recordId: sessionId } }),
+      }),
+    )
+    const json = (await res.json()) as {
+      success?: boolean
+      data?: { record?: { createdBy?: string; data?: { participantIds?: unknown } } }
+    }
+    const record = json.success ? json.data?.record : undefined
+    if (!record) return false
+    const participants = Array.isArray(record.data?.participantIds) ? record.data.participantIds : []
+    return record.createdBy === userId || participants.includes(userId)
+  } catch {
+    return false
+  }
+}
+
 type DocsYjsRole = 'admin' | 'member' | 'viewer'
 
 interface DocumentRecordForAccess {
@@ -150,10 +174,22 @@ export function registerRealtimeRoutes(app: Hono<AppContext>): void {
     ),
   )
 
-  app.get(
-    '/ws/presence/:scopeId',
-    wsRoute((env) => env.PRESENCE_ROOMS),
-  )
+  // TutorPulse uses presence only for a session roster (`session:<id>`), and
+  // the PresenceRoom DO itself admits anyone who connects. So the route checks
+  // membership first: only the session's tutor and its joined students may
+  // enter. Peers' state (current problem, submitted, stuck) is visible to
+  // everyone in the room, so strangers must never get in.
+  app.get('/ws/presence/:scopeId', async (c) => {
+    const scopeId = c.req.param('scopeId')
+    const sessionId = scopeId.startsWith('session:') ? scopeId.slice('session:'.length) : ''
+    if (!sessionId) return new Response('Not found', { status: 404 })
+    const token = new URL(c.req.url).searchParams.get('token')
+    const auth = token ? (await verifyJwt(jwtConfig(c.env), token)).result : null
+    if (!auth) return new Response('Unauthorized', { status: 401 })
+    if (!(await isSessionMember(c.env, sessionId, auth.userId))) return new Response('Forbidden', { status: 403 })
+    const stub = c.env.PRESENCE_ROOMS.get(c.env.PRESENCE_ROOMS.idFromName(scopeId))
+    return stub.fetch(authenticatedRoomRequest(c.req.raw, auth))
+  })
 
   app.get(
     '/ws/cron/:roomId',
