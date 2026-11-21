@@ -16,6 +16,9 @@
 import { isTestAccountEmail } from 'deepspace/worker'
 import type { ActionContext, ActionHandler, ActionTools } from 'deepspace/worker'
 import type { Env } from '../../worker'
+import { checkAnswer } from '../lib/answerCheck'
+import { requestClustering } from './clustering-trigger'
+import type { Envelope, ProblemData } from './types'
 
 const TEST_TITLE_PREFIX = '__test-'
 
@@ -100,7 +103,46 @@ const cleanupPrivacyFixture: ActionHandler<Env> = async ({ userId, params, tools
   return { success: true, data: { deleted } }
 }
 
+/**
+ * Clustering evaluation: seeds problems with many realistic answers (from
+ * placeholder student ids — there aren't enough test accounts to type them
+ * all) and runs the REAL answer checker and the REAL clustering job, so the
+ * tutor can judge the labels. Used by tests/clustering-eval.spec.ts.
+ */
+const clusterEval: ActionHandler<Env> = async ({ userId, params, tools, env }) => {
+  if (!(await isTestUser(tools, userId))) return { success: false, error: 'Test accounts only' }
+  const problems = params.problems
+  if (!Array.isArray(problems) || problems.length === 0 || problems.length > 5) {
+    return { success: false, error: 'problems must be a non-empty array (max 5)' }
+  }
+  const sessionId = await created(tools, 'sessions', {
+    title: `${TEST_TITLE_PREFIX}${Date.now()}__ clustering eval`,
+    status: 'open',
+    joinCode: '',
+    participantIds: [],
+  })
+  const problemIds: string[] = []
+  for (const [i, raw] of problems.entries()) {
+    const p = raw as { prompt: string; answer: string; mistakes?: string; responses: Array<{ answer: string; explanation: string }> }
+    const problemId = await created(tools, 'problems', { sessionId, order: i + 1, prompt: p.prompt })
+    await created(tools, 'answerKeys', { problemId, answer: p.answer, expectedMistakes: p.mistakes ?? '' })
+    for (const [j, r] of p.responses.slice(0, 20).entries()) {
+      const verdict = checkAnswer(r.answer, p.answer).verdict
+      await created(tools, 'submissions', {
+        sessionId, problemId, studentId: `eval-student-${j + 1}`, tutorIds: [userId],
+        answer: r.answer, explanation: r.explanation,
+        isCorrect: verdict === 'correct' ? 1 : 0, needsReview: verdict === 'needs_review' ? 1 : 0, revision: 1,
+      })
+    }
+    const problem = await tools.get<ProblemData>('problems', problemId)
+    if (problem.success) await requestClustering(env, tools, problem.data.record as Envelope<ProblemData>)
+    problemIds.push(problemId)
+  }
+  return { success: true, data: { sessionId, problemIds: problemIds.join(',') } }
+}
+
 export const testActions: Record<string, ActionHandler<Env>> = {
   testSeedPrivacyFixture: seedPrivacyFixture,
   testCleanupPrivacyFixture: cleanupPrivacyFixture,
+  testClusterEval: clusterEval,
 }
