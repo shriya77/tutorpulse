@@ -1,56 +1,12 @@
 # Agent Log
 
-A record of changes made by coding agents in this repo: what changed, why, and how it was checked.
+One row per meaningful change by the coding agent (Claude Code). The last column is for Shriya.
 
----
-
-## 2026-11-21 — Fix scaffold dependency install (npm `edgesOut` crash)
-
-**Problem.** After `npx deepspace app create tutorpulse`, `npm install` failed with
-`npm error Cannot read properties of null (reading 'edgesOut')`. Deleting `node_modules` and
-`package-lock.json` and running `npm cache verify` didn't fix it.
-Environment: Node 22.23.5 (nvm), npm 10.9.9, macOS arm64.
-
-**Cause.** The debug log (`~/.npm/_logs/2026-11-21T18_37_44_792Z-debug-0.log`) shows a
-`TypeError` thrown in npm's resolver,
-`@npmcli/arborist/lib/arborist/build-ideal-tree.js` → `#loadPeerSet`, while it walked a nested
-chain of peer dependencies under `vitest` (the last manifest it fetched was the
-`vite@^6 || ^7 || ^8` peer range). This is a bug in npm 10's arborist peer-set resolution, not a
-problem with `package.json`, a corrupt cache, or the DeepSpace SDK. So the cache and lockfile
-cleanups couldn't help.
-
-**Fix.**
-1. Installed with a newer npm: `npx npm@latest install`, which ran npm 12.2.3 on Node 22.23.5.
-   The install succeeded: 553 packages, and a fresh `package-lock.json` was written.
-   I didn't need `--legacy-peer-deps` (which would hide real peer conflicts) or a switch to bun.
-2. npm 12 blocks dependency install scripts unless they're allowlisted. Two packages need theirs:
-   `esbuild` (native binary for Vite) and `workerd` (the Workers runtime that `deepspace dev`
-   runs on). The scaffold's `pnpm-workspace.yaml` allows the same two for pnpm. I ran
-   `npm install-scripts approve esbuild workerd` and then `npm rebuild esbuild workerd`.
-   This added an `allowScripts` block to `package.json`. It's the only hand-made change to a
-   tracked config file. `fsevents` is still blocked on purpose: it's an optional native file
-   watcher and things work without it.
-3. I didn't touch anything inside `node_modules`.
-
-**Note on versions.** npm wrote `allowScripts` with exact versions, such as `esbuild@0.28.2`. If
-a later install moves esbuild or workerd to a new version, npm 12 will block their scripts
-again. Re-run `npx npm@latest install-scripts approve esbuild workerd` when that happens.
-Keep using npm ≥ 11 (`npx npm@latest …`, or `npm i -g npm@latest` inside the nvm Node 22.23.5)
-so the `edgesOut` crash doesn't come back.
-
-**Verification.**
-- `esbuild --version` → 0.27.7. `workerd --version` → 2026-11-17. Both binaries work.
-- `npm run type-check` (`tsc --noEmit`) → passes.
-- `npm run build` (`vite build`) → passes. The one warning is that the main JS chunk is 569 kB
-  (over Vite's 500 kB advisory limit).
-- `npm run test:unit` → no test files yet, exits 0.
-- `npx deepspace app init` → "Already initialized: app_01M7ZP8D6VYFGEZXFVEZ2HX5YS". The scaffold
-  had already registered the app.
-
-**Repo setup.** The git repo already existed (branch `master`, no commits). `.gitignore` already
-covers `node_modules`, `.dev.vars`, `.dev.vars.*`, `dist`, `.wrangler` and `.deepspace`. I made
-the first commit with the scaffold, `package-lock.json` and this log.
-
-**Open items.** `npm audit` reports 13 vulnerabilities (1 critical, 3 high), all in transitive
-dependencies. I left them alone because `npm audit fix --force` may make breaking upgrades. They
-need a separate look.
+| Date | What I asked | What the agent produced | Agent's uncertainty / what to check | What Shriya verified |
+| --- | --- | --- | --- | --- |
+| 2026-11-21 | Fix the failed `npm install` after scaffolding | Diagnosed npm 10's arborist `#loadPeerSet` crash (an npm bug, not the app). Installed with npm 12 via `npx npm@latest install`, allow-listed the esbuild/workerd install scripts, made the first commit | Superseded by the re-scaffold below. **Correction:** this entry first said `deepspace app init` showed the app was "already initialized". That message came from SDK 0.17 and was wrong: the ID had never been registered (see row 4) | |
+| 2026-11-21 | Phase 0: read the requirements doc, the skill and the SDK | 10-point summary of the doc with risks (practiceSets ownership, unpublished-row leak, tool participant checks, answer-check edge cases) | Risks are from reading only, not running code | |
+| 2026-11-21 | Phase 0: check the installed SDK | Found the scaffold pinned `deepspace ^0.17.0` (stale npx cache) while the current release is 0.44.2. 0.17 has no sandbox, knowledge or `registerAgent`, and has an `actions[name]` lookup hole. You chose to re-scaffold. Built a fresh `deepspace@0.44.2 app create` in a temp dir and copied it over the repo, keeping `docs/`, the skill and git history | Check the scaffold diff in commit `Re-scaffold on DeepSpace SDK 0.44.2`. npm ≥ 11.6 is now required: run `npm i -g npm@11` inside your nvm Node 22 | |
+| 2026-11-21 | Phase 0: register the app | `deepspace app init` refused the old ID (`app_not_registered`: minted locally by 0.17, never registered) and gave the fix `app init --new-id`. My permission settings blocked me from running it | **You need to run** `npx deepspace app init --new-id`. It registers a fresh app under the logged-in DeepSpace account | |
+| 2026-11-21 | Phase 0: answer the doc's open questions | `docs/SDK_NOTES.md`: all 5 questions answered with file/URL references, plus a differences table | Q2 (structured JSON) and Q4 (PDF indexing) are still unverified until the spikes / Phase 3 | |
+| 2026-11-21 | Phase 0: spikes A (AI JSON) and B (sandbox PDF job) | `src/spikes/`: owner-only local-agent tools `spike_generate_json`, `spike_sandbox_enqueue`, `spike_sandbox_result`, plus a `spike-sandbox-pdf` job. Typecheck, build and lint pass | **Not run yet.** They need registration + deploy. To be removed before Phase 1 | |
