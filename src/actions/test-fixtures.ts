@@ -13,10 +13,12 @@
  * rows belonging to such a session created by the caller.
  */
 
-import { isTestAccountEmail } from 'deepspace/worker'
+import { appFiles, isTestAccountEmail } from 'deepspace/worker'
 import type { ActionContext, ActionHandler, ActionTools } from 'deepspace/worker'
 import type { Env } from '../../worker'
 import { checkAnswer } from '../lib/answerCheck'
+import { MAX_WORK_BYTES } from '../lib/limits'
+import { isPngBytes, workRelativeKey } from '../lib/work'
 import { requestClustering } from './clustering-trigger'
 import type { Envelope, ProblemData } from './types'
 
@@ -108,6 +110,11 @@ const cleanupPrivacyFixture: ActionHandler<Env> = async ({ userId, params, tools
  * placeholder student ids — there aren't enough test accounts to type them
  * all) and runs the REAL answer checker and the REAL clustering job, so the
  * tutor can judge the labels. Used by tests/clustering-eval.spec.ts.
+ *
+ * A response may carry `work` (base64 PNG of handwritten working): it is
+ * stored in that placeholder student's own private folder, exactly where the
+ * pad puts a real student's drawing, so the job reads it the same way.
+ * `noImages: true` makes the job ignore the working, for comparison.
  */
 const clusterEval: ActionHandler<Env> = async ({ userId, params, tools, env }) => {
   if (!(await isTestUser(tools, userId))) return { success: false, error: 'Test accounts only' }
@@ -124,20 +131,38 @@ const clusterEval: ActionHandler<Env> = async ({ userId, params, tools, env }) =
   })
   const problemIds: string[] = []
   for (const [i, raw] of problems.entries()) {
-    const p = raw as { prompt: string; answer: string; mistakes?: string; responses: Array<{ answer: string; explanation: string }> }
+    const p = raw as {
+      prompt: string
+      answer: string
+      mistakes?: string
+      responses: Array<{ answer: string; explanation: string; work?: string }>
+    }
     const problemId = await created(tools, 'problems', { sessionId, order: i + 1, prompt: p.prompt })
     await created(tools, 'answerKeys', { problemId, answer: p.answer, expectedMistakes: p.mistakes ?? '' })
     for (const [j, r] of p.responses.slice(0, 20).entries()) {
       const verdict = checkAnswer(r.answer, p.answer).verdict
+      const studentId = `eval-student-${j + 1}`
+      let workKey = ''
+      if (typeof r.work === 'string' && r.work) {
+        const bytes = Uint8Array.from(atob(r.work), (c) => c.charCodeAt(0))
+        if (bytes.byteLength > MAX_WORK_BYTES || !isPngBytes(bytes)) return { success: false, error: 'work must be a small PNG' }
+        const stored = await appFiles(env, { scope: 'self', userId: studentId }).upload(new Blob([bytes], { type: 'image/png' }), {
+          key: workRelativeKey(problemId),
+          name: 'working.png',
+        })
+        workKey = stored.key
+      }
       await created(tools, 'submissions', {
-        sessionId, problemId, studentId: `eval-student-${j + 1}`, tutorIds: [userId],
-        answer: r.answer, explanation: r.explanation,
+        sessionId, problemId, studentId, tutorIds: [userId],
+        answer: r.answer, explanation: r.explanation, workKey,
         isCorrect: verdict === 'correct' ? 1 : 0, needsReview: verdict === 'needs_review' ? 1 : 0, revision: 1,
       })
     }
     const problem = await tools.get<ProblemData>('problems', problemId)
     const model = typeof params.model === 'string' ? params.model : undefined
-    if (problem.success) await requestClustering(env, tools, problem.data.record as Envelope<ProblemData>, model)
+    if (problem.success) {
+      await requestClustering(env, tools, problem.data.record as Envelope<ProblemData>, model, params.noImages === true)
+    }
     problemIds.push(problemId)
   }
   return { success: true, data: { sessionId, problemIds: problemIds.join(',') } }

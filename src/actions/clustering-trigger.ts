@@ -22,6 +22,8 @@ export interface ClusterJobPayload {
   problemId: string
   /** Evaluation only (set by the local test-only `testClusterEval`); the job allowlists it. */
   model?: string
+  /** Evaluation only: ignore students' working images, to measure what they add. */
+  noImages?: boolean
 }
 
 export async function requestClustering(
@@ -29,6 +31,7 @@ export async function requestClustering(
   tools: ActionTools,
   problem: Envelope<ProblemData>,
   model?: string,
+  noImages?: boolean,
 ): Promise<'enqueued' | 'marked_dirty' | 'already_dirty'> {
   const state = problem.data.clusterState ?? 'idle'
   if (state === 'dirty') return 'already_dirty'
@@ -37,7 +40,7 @@ export async function requestClustering(
     return 'marked_dirty'
   }
   await tools.update('problems', problem.recordId, { clusterState: 'running' })
-  const payload: ClusterJobPayload = model ? { problemId: problem.recordId, model } : { problemId: problem.recordId }
+  const payload: ClusterJobPayload = { problemId: problem.recordId, ...(model ? { model } : {}), ...(noImages ? { noImages } : {}) }
   await enqueueJob(env.JOB_ROOMS, `app:${env.DEEPSPACE_APP_ID}`, CLUSTER_JOB, payload, { maxAttempts: 2 })
   return 'enqueued'
 }

@@ -4,7 +4,9 @@
  *  1. Load the problem, the tutor's key + expected-mistake note, the labels
  *     already on the board, and every WRONG submission for the problem.
  *  2. Ask Claude (owner-billed, fast model) for { clusters: [...] } via
- *     structured output.
+ *     structured output. Students' handwritten working (PNGs in each
+ *     student's private folder) is attached as images, so the groups follow
+ *     the step where the working went wrong, not only the one-line note.
  *  3. Validate with src/lib/clusters.ts; on failure retry once with the
  *     reason; then fall back to grouping identical answers.
  *  4. Replace the problem's cluster rows (update in place by label, so the
@@ -17,15 +19,16 @@
  * + the session's AI counter.
  */
 
-import { generateText, Output } from 'ai'
-import { buildCronContext, createDeepSpaceAI } from 'deepspace/worker'
+import { generateText, Output, type ModelMessage, type UserContent } from 'ai'
+import { appFiles, buildCronContext, createDeepSpaceAI } from 'deepspace/worker'
 import type { JobContext } from 'deepspace/worker'
 import type { Env } from '../../worker'
 import type { AnswerKeyData, ClusterData, Envelope, ProblemData, SessionData, SubmissionData } from '../actions/types'
 import type { ClusterJobPayload } from '../actions/clustering-trigger'
 import { buildClusterPrompt, buildRetryNote, CLUSTER_INSTRUCTIONS } from '../ai/prompts/cluster'
 import { clusterOutputSchema, fallbackClusters, validateClusters, type ValidCluster } from '../lib/clusters'
-import { MAX_CLUSTER_RUNS_PER_SESSION } from '../lib/limits'
+import { MAX_CLUSTER_RUNS_PER_SESSION, MAX_WORK_BYTES, MAX_WORK_IMAGES_PER_RUN } from '../lib/limits'
+import { isPngBytes } from '../lib/work'
 import { misconceptionsFor } from '../ai/misconceptions/math2413'
 
 export const CLUSTER_MODEL = 'claude-haiku-5-5'
@@ -44,6 +47,8 @@ export interface ClusterJobResult {
   wrong: number
   clusters: number
   source: 'ai' | 'ai_retry' | 'fallback' | 'none'
+  /** Working images sent to the model. */
+  images?: number
   reason?: string
   rerun: boolean
 }
@@ -73,6 +78,7 @@ export async function runClusterJob(payload: ClusterJobPayload, ctx: JobContext,
     let clusters: ValidCluster[] = []
     let source: ClusterJobResult['source'] = 'none'
     let reason: string | undefined
+    let images = 0
 
     if (wrong.length > 0) {
       const wrongIds = wrong.map((s) => s.recordId)
@@ -84,19 +90,35 @@ export async function runClusterJob(payload: ClusterJobPayload, ctx: JobContext,
         ctx.progress(0.3, 'Grouping wrong answers')
         const ai = createDeepSpaceAI(env, 'anthropic') // owner-billed: no authToken
         const library = misconceptionsFor(session.data.topic)
+        const work = payload.noImages ? new Map<string, Uint8Array>() : await loadWorkImages(env, wrong)
+        images = work.size
         const baseInput = {
           problemPrompt: problem.data.prompt,
           answerKey: key.data.answer,
           expectedMistakes: key.data.expectedMistakes,
           existingLabels: [...new Set(existing.map((c) => c.data.label))],
-          submissions: wrong.map((s) => ({ id: s.recordId, answer: s.data.answer, explanation: s.data.explanation ?? '' })),
+          submissions: wrong.map((s) => ({
+            id: s.recordId,
+            answer: s.data.answer,
+            explanation: s.data.explanation ?? '',
+            ...(work.has(s.recordId) ? { hasWorking: true } : {}),
+          })),
+        }
+        // The prompt text, then each student's working image labelled with its id.
+        const firstMessage = (withLibrary: boolean): UserContent => {
+          const text = buildClusterPrompt(withLibrary ? { ...baseInput, topicMisconceptions: library } : baseInput)
+          if (work.size === 0) return text
+          const parts: Exclude<UserContent, string> = [{ type: 'text', text }]
+          for (const [id, bytes] of work) {
+            parts.push({ type: 'text', text: `Handwritten working for submission ${id}:` })
+            parts.push({ type: 'image', image: bytes, mediaType: 'image/png' })
+          }
+          return parts
         }
 
         // One conversation: the model's answer, then a retry note naming what to fix.
         const runAttempts = async (withLibrary: boolean, maxAttempts: number) => {
-          const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
-            { role: 'user', content: buildClusterPrompt(withLibrary ? { ...baseInput, topicMisconceptions: library } : baseInput) },
-          ]
+          const messages: ModelMessage[] = [{ role: 'user', content: firstMessage(withLibrary) }]
           for (let attempt = 0; attempt < maxAttempts; attempt++) {
             // A 3rd attempt only when the sole problem left is label length.
             if (attempt === 2 && !reason?.startsWith('label:')) return
@@ -145,7 +167,7 @@ export async function runClusterJob(payload: ClusterJobPayload, ctx: JobContext,
     const rerun = latest?.data.clusterState === 'dirty'
     await records.update('problems', problem.recordId, { clusterState: rerun ? 'running' : 'idle' })
 
-    const result = { problemId: problem.recordId, wrong: wrong.length, clusters: clusters.length, source, reason, rerun }
+    const result = { problemId: problem.recordId, wrong: wrong.length, clusters: clusters.length, source, images, reason, rerun }
     console.log('[cluster-problem]', JSON.stringify(result))
     return result
   } catch (e) {
@@ -153,6 +175,33 @@ export async function runClusterJob(payload: ClusterJobPayload, ctx: JobContext,
     await records.update('problems', problem.recordId, { clusterState: 'idle' }).catch(() => undefined)
     throw e
   }
+}
+
+/**
+ * Students' working images for this run: newest revisions first, at most
+ * MAX_WORK_IMAGES_PER_RUN. Each file is read from ITS OWN student's private
+ * folder (a key pointing anywhere else is refused by appFiles) and must be a
+ * small PNG. A missing or bad file just means that student is grouped from
+ * their typed answer, as before.
+ */
+async function loadWorkImages(env: Env, wrong: Envelope<SubmissionData>[]): Promise<Map<string, Uint8Array>> {
+  const out = new Map<string, Uint8Array>()
+  const withWork = wrong
+    .filter((s) => s.data.workKey)
+    .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
+    .slice(0, MAX_WORK_IMAGES_PER_RUN)
+  await Promise.all(
+    withWork.map(async (s) => {
+      try {
+        const res = await appFiles(env, { scope: 'self', userId: s.data.studentId }).download(s.data.workKey!)
+        const bytes = new Uint8Array(await res.arrayBuffer())
+        if (bytes.byteLength <= MAX_WORK_BYTES && isPngBytes(bytes)) out.set(s.recordId, bytes)
+      } catch {
+        // grouped from the typed answer only
+      }
+    }),
+  )
+  return out
 }
 
 /** Update rows whose label survives, create new ones, delete stale ones. */

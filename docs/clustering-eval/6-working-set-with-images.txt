@@ -1,0 +1,39 @@
+set: working · model: default (claude-haiku-5-5) · topic: none · working images: used
+
+Problem 1: \frac{d}{dx}\,\frac{2x+1}{x-3}  (key -7/(x-3)^2)
+  10 answers, 1 correct · 4 clusters vs 4 intended · agreement 1.00
+  ● Swapped the subtraction order — 3
+      Wrote (2x+1)(1) minus (x-3)(2) on top, reversing the order of the quotient rule, which gives 7/(x-3)^2 or 7/(x^2-6x+9). Try asking: which term gets the minus sign in f'g minus fg', and which is f?
+      · 7/(x-3)^2        ""  [swapped-numerator-order]
+      · 7/(x-3)^2        "quotient rule"  [swapped-numerator-order]
+      · 7/(x^2-6x+9)     "simplified it"  [swapped-numerator-order]
+  ● Thinks squaring makes it positive — 2
+      Got -7 on the top correctly, then dropped the minus sign because the denominator is squared, writing 7/(x-3)^2. Try asking: does squaring the bottom change the sign of the top?
+      · 7/(x-3)^2        "low d high minus high d low"  [dropped-final-sign]
+      · 7/(x-3)^2        "quotient rule"  [dropped-final-sign]
+  ● Left the denominator as x-3 — 2
+      Used the quotient rule numerator but kept the denominator as (x-3) instead of squaring it, giving -7/(x-3). Try asking: what power does the bottom function get in the quotient rule?
+      · -7/(x-3)         "idk"  [denominator-not-squared]
+      · -7/(x-3)         "quotient rule"  [denominator-not-squared]
+  ● Dropped the minus on +1 — 2
+      Set up the quotient rule correctly but expanded -(2x+1) as -2x+1, getting -5/(x-3)^2 instead of -7/(x-3)^2. Try asking: what is 2x+1 with the minus sign in front of the whole bracket?
+      · -5/(x-3)^2       ""  [minus-not-distributed]
+      · -5/(x-3)^2       "quotient rule"  [minus-not-distributed]
+
+Problem 2: \frac{d}{dx}\,x^2 e^{3x}  (key 2x*e^(3x) + 3x^2*e^(3x))
+  8 answers, 1 correct · 3 clusters vs 3 intended · agreement 1.00
+  ● Forgot the ×3 chain factor — 3
+      Differentiated e^(3x) as just e^(3x), giving 2x e^(3x) + x^2 e^(3x) or x e^(3x)(2 + x). Try asking: what is the derivative of e^(3x) when the exponent is 3x rather than x?
+      · 2x e^(3x) + x^2 e^(3x) ""  [no-chain-on-exponential]
+      · x e^(3x) (2 + x) "product rule then factor"  [no-chain-on-exponential]
+      · 2x e^(3x) + x^2 e^(3x) "product rule"  [no-chain-on-exponential]
+  ● Multiplied the two derivatives — 2
+      Differentiated each factor and multiplied them, e.g. (2x)(3e^(3x)) = 6x e^(3x), instead of using the product rule. Try asking: if you multiply the derivative of x^2 by the derivative of e^(3x), do you get the derivative of the whole product?
+      · 6x e^(3x)        "derivative of each"  [multiplied-derivatives]
+      · 6x e^(3x)        "product rule"  [multiplied-derivatives]
+  ● Added 2x and 3x² together — 2
+      Correct product rule terms 2x e^(3x) + 3x^2 e^(3x) were reached, but then the unlike terms 2x and 3x^2 were added, giving 5x^2 e^(3x) or 5x^3 e^(3x). Try asking: can you add 2x and 3x^2 as like terms, and what is the common factor you can take out?
+      · 5x^2 e^(3x)      "product + chain"  [combined-unlike-terms]
+      · 5x^3 e^(3x)      "product rule"  [combined-unlike-terms]
+
+mean agreement: 1.00

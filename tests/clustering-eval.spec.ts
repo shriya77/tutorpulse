@@ -8,14 +8,40 @@
  * to show — and a score: pairwise agreement (Rand index) between the AI's
  * grouping and the intended one, over the wrong answers. 1.00 = identical.
  * Output is also written to test-results/clustering-eval.txt.
+ *
+ * EVAL_SET=working uses the whiteboard set (tests/fixtures/working-eval.ts):
+ * each student's working is rendered as a handwriting-style PNG and stored
+ * like a real pad drawing. EVAL_NO_IMAGES=1 runs the same data with the job
+ * told to ignore the images, so the two scores show what the working adds.
  */
 import { writeFileSync } from 'node:fs'
 import { test, expect, loadAllTestAccounts } from 'deepspace/testing'
 import { DEMO_PROBLEMS as CHAIN_RULE } from './fixtures/chain-rule-demo'
 import { PLTL_WEEK4_PROBLEMS } from './fixtures/pltl-week4'
+import { WORKING_PROBLEMS, type WorkingProblem } from './fixtures/working-eval'
+import type { Page } from '@playwright/test'
 
-/** EVAL_SET=pltl-week4 evaluates real PLTL Week 4 problems instead of the chain-rule demo. */
-const DEMO_PROBLEMS = process.env.EVAL_SET === 'pltl-week4' ? PLTL_WEEK4_PROBLEMS : CHAIN_RULE
+/** EVAL_SET=pltl-week4 evaluates real PLTL Week 4 problems; EVAL_SET=working the whiteboard set. */
+const DEMO_PROBLEMS: WorkingProblem[] =
+  process.env.EVAL_SET === 'pltl-week4' ? PLTL_WEEK4_PROBLEMS : process.env.EVAL_SET === 'working' ? WORKING_PROBLEMS : CHAIN_RULE
+const NO_IMAGES = process.env.EVAL_NO_IMAGES === '1'
+
+/** Render a student's working lines as an 800×600 handwriting-style PNG (base64), like a pad drawing. */
+async function renderWorking(page: Page, lines: string[], seed: number): Promise<string> {
+  const tilt = ((seed * 37) % 7) - 3
+  const html = `<!doctype html><html><head>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500&display=block" rel="stylesheet">
+    <style>
+      body{margin:0;background:#fff}
+      #pad{width:800px;height:600px;box-sizing:border-box;padding:36px 44px;font:500 40px/1.55 Caveat,'Comic Sans MS',cursive;color:#1d2b3a}
+      div.l{white-space:pre;transform:rotate(${tilt * 0.3}deg)}
+    </style></head><body><div id="pad">${lines
+      .map((l, i) => `<div class="l" style="margin-left:${((seed + i) * 13) % 24}px">${l.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</div>`)
+      .join('')}</div></body></html>`
+  await page.setContent(html, { waitUntil: 'networkidle' })
+  await page.evaluate(() => document.fonts.ready)
+  return (await page.locator('#pad').screenshot({ type: 'png' })).toString('base64')
+}
 
 test.skip(process.env.RUN_AI_EVAL !== '1', 'Set RUN_AI_EVAL=1 to run the (AI-billed) clustering evaluation.')
 test.skip(loadAllTestAccounts().length < 1, 'Needs 1 usable test account.')
@@ -44,8 +70,20 @@ test('clustering evaluation on the demo problems', async ({ users }) => {
   const model = process.env.EVAL_MODEL
   const topic = process.env.EVAL_TOPIC // e.g. math2413-w4: give the AI that week's misconception library
 
+  // Handwritten working, rendered once per response that has some.
+  const painter = await tutor.context.newPage()
+  const problems = []
+  for (const [pi, p] of DEMO_PROBLEMS.entries()) {
+    const responses = []
+    for (const [ri, r] of p.responses.entries()) {
+      responses.push({ answer: r.answer, explanation: r.explanation, ...(r.working ? { work: await renderWorking(painter, r.working, pi * 31 + ri) } : {}) })
+    }
+    problems.push({ prompt: p.prompt, answer: p.answer, mistakes: p.mistakes, responses })
+  }
+  await painter.close()
+
   const seeded = (await (
-    await tutor.context.request.post('/api/actions/testClusterEval', { headers: auth, data: { problems: DEMO_PROBLEMS, model, topic } })
+    await tutor.context.request.post('/api/actions/testClusterEval', { headers: auth, data: { problems, model, topic, noImages: NO_IMAGES } })
   ).json()) as { success: boolean; data?: { sessionId: string; problemIds: string }; error?: string }
   expect(seeded.success, seeded.error).toBe(true)
   const { sessionId, problemIds } = seeded.data!
@@ -64,13 +102,16 @@ test('clustering evaluation on the demo problems', async ({ users }) => {
       .poll(async () => (await query('problems', { sessionId })).every((p) => p.data.clusterState === 'idle'), { timeout: 240_000, intervals: [3_000] })
       .toBe(true)
 
-    const report: string[] = [`set: ${process.env.EVAL_SET ?? 'chain-rule-demo'} · model: ${model ?? 'default (claude-haiku-5-5)'} · topic: ${topic ?? 'none'}`]
+    const report: string[] = [
+      `set: ${process.env.EVAL_SET ?? 'chain-rule-demo'} · model: ${model ?? 'default (claude-haiku-5-5)'} · topic: ${topic ?? 'none'} · working images: ${NO_IMAGES ? 'ignored' : 'used'}`,
+    ]
     const scores: number[] = []
     for (const [i, problemId] of problemIds.split(',').entries()) {
       const demo = DEMO_PROBLEMS[i]
       const subs = await query('submissions', { problemId })
       const clusters = (await query('clusters', { problemId })).sort((a, b) => Number(b.data.count) - Number(a.data.count))
-      const intendedOf = (s: Row) => demo.responses.find((r) => r.answer === s.data.answer && r.explanation === s.data.explanation)?.intended ?? '?'
+      // Placeholder student N wrote response N (two responses can share an answer and note).
+      const intendedOf = (s: Row) => demo.responses[Number(String(s.data.studentId).replace('eval-student-', '')) - 1]?.intended ?? '?'
       const clusterOf = new Map<string, string>()
       for (const c of clusters) for (const id of c.data.submissionIds as string[]) clusterOf.set(id, String(c.data.label))
       const wrong = subs.filter((s) => s.data.isCorrect !== 1)
@@ -90,7 +131,7 @@ test('clustering evaluation on the demo problems', async ({ users }) => {
       expect(clusters.reduce((n, c) => n + Number(c.data.count), 0)).toBe(wrong.length)
     }
     report.push(`\nmean agreement: ${(scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2)}`)
-    writeFileSync('test-results/clustering-eval.txt', report.join('\n'))
+    writeFileSync(`test-results/clustering-eval${NO_IMAGES ? '-no-images' : ''}.txt`, report.join('\n'))
     console.log('[clustering-eval]\n' + report.join('\n'))
   } finally {
     await tutor.context.request.post('/api/actions/testCleanupPrivacyFixture', { headers: auth, data: { sessionId } })
