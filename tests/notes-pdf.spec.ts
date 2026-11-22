@@ -2,11 +2,12 @@
  * Does the managed knowledge base index a PDF directly? (SDK_NOTES Q4.)
  * Uploads a real PDF as session notes on the deployed app and waits for the
  * indexing status. Needs a PDF at tests/fixtures/notes-sample.pdf.
- *   npx playwright test -c tests/playwright.live.config.ts tests/notes-pdf.spec.ts
+ *   RUN_AI_TESTS=1 npx playwright test -c tests/playwright.live.config.ts tests/notes-pdf.spec.ts
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { test, expect, loadAllTestAccounts } from 'deepspace/testing'
 
+test.skip(process.env.RUN_AI_TESTS !== '1', 'AI/knowledge-billed: set RUN_AI_TESTS=1 to run (about $1 of credits per full run).')
 const PDF = 'tests/fixtures/notes-sample.pdf'
 test.skip(loadAllTestAccounts().length < 1 || !existsSync(PDF), 'Needs a test account and tests/fixtures/notes-sample.pdf.')
 

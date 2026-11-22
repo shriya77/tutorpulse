@@ -2,7 +2,7 @@
  * Phase 3 depth features, end to end with three real users. Uses real AI
  * (clustering, hints, sandbox PDF) and the managed knowledge base, so it is
  * meant for the DEPLOYED app:
- *   npx playwright test -c tests/playwright.live.config.ts tests/phase3.spec.ts
+ *   RUN_AI_TESTS=1 npx playwright test -c tests/playwright.live.config.ts tests/phase3.spec.ts
  * Transcripts and screenshots land in test-results/phase3-*.
  *
  *  F14  tutor uploads a notes file → "Ready for hints"
@@ -15,6 +15,7 @@
 import { writeFileSync } from 'node:fs'
 import { test, expect, loadAllTestAccounts, type MultiplayerUser } from 'deepspace/testing'
 
+test.skip(process.env.RUN_AI_TESTS !== '1', 'AI/knowledge-billed: set RUN_AI_TESTS=1 to run (about $1 of credits per full run).')
 test.skip(loadAllTestAccounts().length < 3, 'Needs 3 usable test accounts.')
 
 const NOTES = `# Chain rule — tutor notes
