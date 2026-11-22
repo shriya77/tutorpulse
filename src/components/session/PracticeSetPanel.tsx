@@ -42,7 +42,9 @@ export function PracticeSetPanel({ session }: { session: Envelope<SessionData> }
       ) : !latest ? (
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">Generate a PDF with new problems that target this session’s most common mistakes.</p>
-          <Button onClick={() => run('generatePracticeSet', { sessionId: session.recordId })} disabled={busy}>Generate practice set</Button>
+          <Button onClick={() => run('generatePracticeSet', { sessionId: session.recordId })} disabled={busy} data-testid="generate-practice-set">
+            Generate practice set
+          </Button>
         </div>
       ) : latest.data.status === 'generating' ? (
         <p className="text-sm text-muted-foreground" aria-live="polite" data-testid="practice-progress">

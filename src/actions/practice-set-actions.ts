@@ -3,8 +3,9 @@
  *
  * - `startPracticeSet` creates the `practiceSets` row (readable only by the
  *   tutor) and enqueues the `practice-set` sandbox job, within the session's
- *   cap. `closeSession` calls it so "End session" kicks off generation, as in
- *   REQUIREMENTS Flow E; `generatePracticeSet` lets the tutor retry.
+ *   cap. The tutor starts it from the wrap-up panel after ending the session
+ *   (`generatePracticeSet`) — one click instead of the doc's automatic Flow E,
+ *   so AI credits are only spent when the tutor wants a set.
  * - `publishPracticeSet` is the ONLY way students gain read access: it copies
  *   the session's participants onto the row and flips it to `published`.
  */

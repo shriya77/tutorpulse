@@ -119,6 +119,7 @@ test('phase 3: notes, roster, drill-in, board, hints, practice set', async ({ us
   tutor.page.once('dialog', (d) => d.accept())
   await tutor.page.getByRole('button', { name: 'End session' }).click()
   await expect(tutor.page.getByTestId('practice-panel')).toBeVisible({ timeout: 15_000 })
+  await tutor.page.getByTestId('generate-practice-set').click()
   await expect(tutor.page.getByTestId('practice-status')).toHaveText('Ready to review', { timeout: 240_000 })
   await shot(tutor, '4-practice-ready')
   // Before sharing, students get nothing.

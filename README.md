@@ -164,7 +164,7 @@ No API keys live in this repo. AI, the sandbox and knowledge all go through the 
 2. **Students:** scan the QR code or enter the code at `/home`, sign in, and answer. Try `cos(3x^2)` with "derivative of sin is cos" for a wrong answer, and `6x cos(3x²)` for a right one.
 3. **Board:** watch the counts and the named cluster appear within seconds. Click **Show answers**, then **Take to board**; students see "Discussing: …". Students tap **I'm stuck** or **Hint**.
 4. **Revise:** **Re-open answers**; a student fixes their answer and the cluster count falls.
-5. **Wrap up:** **End session** → the practice set generates (about a minute) → **Download to review** → **Share with students** → students download the PDF.
+5. **Wrap up:** **End session** → **Generate practice set** (about a minute) → **Download to review** → **Share with students** → students download the PDF. (Generation is a deliberate click rather than automatic, so AI credits are only spent when the tutor wants a set.)
 
 ## Known limitations / next steps
 
