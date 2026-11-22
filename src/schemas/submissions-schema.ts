@@ -26,6 +26,13 @@ export const submissionsSchema: CollectionSchema = {
     /** 1 = the answer could not be parsed, so it was sent to clustering as raw text. */
     { name: 'needsReview', storage: 'number', interpretation: { kind: 'boolean' }, default: 0 },
     { name: 'revision', storage: 'number', interpretation: 'plain', default: 1 },
+    /**
+     * Full storage key of the student's handwritten working (a PNG in the
+     * STUDENT's private folder), or ''. Set only by `submitAnswer`, which
+     * re-reads the file from the caller's own folder before storing the key.
+     * The image is served only by GET /api/submissions/:id/work.
+     */
+    { name: 'workKey', storage: 'text', interpretation: 'plain', default: '' },
   ],
   ownerField: 'studentId',
   collaboratorsField: 'tutorIds',

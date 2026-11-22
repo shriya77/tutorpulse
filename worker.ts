@@ -35,6 +35,7 @@ import {
 } from './src/server/http-routes.js'
 import { registerRealtimeRoutes } from './src/server/realtime-routes.js'
 import { registerPracticeSetRoutes } from './src/server/practice-set-routes.js'
+import { registerWorkRoutes } from './src/server/work-routes.js'
 
 // Dynamic deploy reads this manifest to create the app's DO bindings.
 export const __DO_MANIFEST__ = [
@@ -151,6 +152,7 @@ registerAuthAndIntegrationRoutes(app)
 registerRealtimeRoutes(app)
 registerActionRoutes(app, resolveAuth)
 registerPracticeSetRoutes(app, resolveAuth)
+registerWorkRoutes(app, resolveAuth)
 // Every scaffold exposes selected tools through HTTP, MCP and browser tools.
 // Only copilot owns the collections needed for the in-app chat UI.
 registerAgent(app, {

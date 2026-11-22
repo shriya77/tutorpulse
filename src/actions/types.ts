@@ -51,6 +51,8 @@ export type SubmissionData = {
   isCorrect: number
   needsReview: number
   revision: number
+  /** Full key of the working PNG in the student's private folder, or ''. */
+  workKey?: string
 }
 
 export type ClusterData = {

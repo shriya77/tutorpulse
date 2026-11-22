@@ -8,14 +8,22 @@
  *    `studentId` (owner) and `tutorIds` (readers) from verified identity.
  * 5. If the set of wrong answers changed, ask for re-clustering (debounced).
  *
+ * Optional `workKey`: the student's handwritten working, already uploaded to
+ * THEIR private folder. It is re-read from the caller's own folder (a key in
+ * anyone else's folder is refused by appFiles) and must be a small PNG, so a
+ * student can never point their submission at someone else's file.
+ *
  * The student is told only that the answer was saved, not whether it was
  * correct: the tool is formative, and revealing the verdict would let a
  * student guess-and-check their way to the key.
  */
 
+import { appFiles } from 'deepspace/worker'
 import type { ActionHandler } from 'deepspace/worker'
 import type { Env } from '../../worker'
 import { checkAnswer, type Verdict } from '../lib/answerCheck'
+import { MAX_WORK_BYTES } from '../lib/limits'
+import { isPngBytes } from '../lib/work'
 import { requestClustering } from './clustering-trigger'
 import { loadSessionProblem, requireParticipant } from './guards'
 import type { AnswerKeyData, Envelope, SubmissionData } from './types'
@@ -30,6 +38,13 @@ export const submitAnswer: ActionHandler<Env> = async (ctx) => {
   if (answer.length > MAX_ANSWER_LENGTH) return { success: false, error: `Keep the answer under ${MAX_ANSWER_LENGTH} characters` }
   if (explanation.length > MAX_EXPLANATION_LENGTH) {
     return { success: false, error: `Keep the explanation under ${MAX_EXPLANATION_LENGTH} characters` }
+  }
+
+  const workKey = typeof ctx.params.workKey === 'string' ? ctx.params.workKey.trim() : ''
+  if (workKey) {
+    if (workKey.length > 300) return { success: false, error: 'Could not read your working' }
+    const work = await readOwnWork(ctx.env, ctx.userId, workKey)
+    if (!work.ok) return { success: false, error: work.error }
   }
 
   const p = await loadSessionProblem(ctx, ctx.params.problemId)
@@ -61,6 +76,7 @@ export const submitAnswer: ActionHandler<Env> = async (ctx) => {
     needsReview: verdict === 'needs_review' ? 1 : 0,
     revision: (previous?.data.revision ?? 0) + 1,
     tutorIds: [session.createdBy],
+    workKey,
   }
   const saved = previous
     ? await ctx.tools.update('submissions', previous.recordId, row)
@@ -78,4 +94,17 @@ export const submitAnswer: ActionHandler<Env> = async (ctx) => {
   if (verdict !== 'correct' || wasWrong) await requestClustering(ctx.env, ctx.tools, problem)
 
   return { success: true, data: { revision: row.revision } }
+}
+
+/** Read a working image from the CALLER's own private folder and check it. */
+async function readOwnWork(env: Env, userId: string, key: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const res = await appFiles(env, { scope: 'self', userId }).download(key)
+    const bytes = new Uint8Array(await res.arrayBuffer())
+    if (bytes.byteLength > MAX_WORK_BYTES) return { ok: false, error: 'Your working image is too large' }
+    if (!isPngBytes(bytes)) return { ok: false, error: 'Your working must be a drawing from the pad' }
+    return { ok: true }
+  } catch {
+    return { ok: false, error: 'Could not read your working' }
+  }
 }
