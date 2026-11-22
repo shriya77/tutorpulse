@@ -64,6 +64,20 @@ test('T5: forged and out-of-turn requests are refused', async ({ users }) => {
       data: { revision: 1 },
     })
 
+    // F17: the tutor's agent can pull the session report; nobody else can.
+    const report = async (w: Who) =>
+      w.api.post('/_deepspace/agent/browser/tools/sessionReport', {
+        headers: { Authorization: `Bearer ${w.token}` },
+        data: { input: { sessionId } },
+      })
+    const mine = await report(tutor)
+    expect(mine.status()).toBe(200)
+    const body = (await mine.json()) as { result: { studentsJoined: number; problems: Array<{ submitted: number; correct: number }> } }
+    expect(body.result.studentsJoined).toBe(1)
+    expect(body.result.problems[0]).toMatchObject({ submitted: 1, correct: 1 })
+    expect(JSON.stringify(body)).not.toContain('2x') // counts only, no answers
+    for (const w of [a, b]) expect((await report(w)).status()).toBe(403)
+
     // Non-participant (B never joined) is refused, with no hint the session exists.
     expect((await action(b, 'submitAnswer', { problemId, answer: '2x', explanation: '' })).body).toEqual({
       success: false,

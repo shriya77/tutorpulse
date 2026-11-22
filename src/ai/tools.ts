@@ -18,11 +18,12 @@
 import { jsonSchema, tool } from 'ai'
 import type { ToolSet } from 'ai'
 import { z } from 'zod/v4'
-import { BUILT_IN_TOOLS, applyAiToolDefaults, knowledge } from 'deepspace/worker'
+import { AgentToolError, BUILT_IN_TOOLS, applyAiToolDefaults, knowledge } from 'deepspace/worker'
 import type { AgentToolContext, ToolSchema } from 'deepspace/worker'
 import type { Env } from '../../worker'
-import type { ProblemData } from '../actions/types'
-import { findActiveSession, queryRecords } from '../server/owner-records'
+import type { ClusterData, PracticeSetData, ProblemData, SessionData, SubmissionData } from '../actions/types'
+import { buildSessionReport } from '../lib/sessionReport'
+import { findActiveSession, getRecord, queryRecords } from '../server/owner-records'
 
 type ToolExecutor = (toolName: string, params: Record<string, unknown>) => Promise<unknown>
 
@@ -41,7 +42,10 @@ function isHintChat(context?: AgentToolContext<Env>): boolean {
 
 export function buildTools(executor: ToolExecutor, context?: AgentToolContext<Env>): ToolSet {
   const tools: ToolSet = context ? buildHintTools(context) : {}
-  const allowed = isHintChat(context) ? READ_TOOL_NAMES : [...READ_TOOL_NAMES, ...WRITE_TOOL_NAMES]
+  const hintChat = isHintChat(context)
+  const allowed = hintChat ? READ_TOOL_NAMES : [...READ_TOOL_NAMES, ...WRITE_TOOL_NAMES]
+  // F17: the tutor's local agent can pull a session report. Not offered to the in-app hint chat.
+  if (context && !hintChat) tools.sessionReport = buildSessionReportTool(context)
 
   for (const def of BUILT_IN_TOOLS) {
     if (!allowed.includes(def.name)) continue
@@ -105,6 +109,45 @@ function buildHintTools(context: AgentToolContext<Env>): ToolSet {
       },
     }),
   }
+}
+
+// ============================================================================
+// Session report (F17) — `npx deepspace agent invoke tutorpulse sessionReport`
+// ============================================================================
+
+/**
+ * Tutor-only. `registerAgent`'s `authorize` callback gates EVERY tool on both
+ * surfaces (it would also lock students out of hints), so the per-session
+ * tutor check lives here: the caller must have created the session. Data is
+ * read with owner access only after that check passes.
+ */
+function buildSessionReportTool(context: AgentToolContext<Env>) {
+  const { env, userId } = context
+  return tool({
+    description:
+      'Report on one of YOUR TutorPulse sessions (you must be its tutor): per-problem submitted/correct counts, the misconceptions found, and practice-set status. No student names. Omit sessionId for your most recent session.',
+    inputSchema: z.object({ sessionId: z.string().max(100).optional().describe('Session id; defaults to your most recent session') }),
+    execute: async ({ sessionId }: { sessionId?: string }) => {
+      let session = sessionId ? await getRecord<SessionData>(env, 'sessions', sessionId) : null
+      if (!sessionId) {
+        session = (await queryRecords<SessionData>(env, 'sessions', { createdBy: userId }))
+          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null
+        if (!session) throw new AgentToolError('no_sessions', 'You have not run any TutorPulse sessions yet.', 404)
+      }
+      // Same message whether it doesn't exist or isn't yours.
+      if (!session || session.createdBy !== userId) {
+        throw new AgentToolError('forbidden', 'Session not found, or you are not its tutor.', 403)
+      }
+      const where = { sessionId: session.recordId }
+      const [problems, submissions, clusters, practiceSets] = await Promise.all([
+        queryRecords<ProblemData>(env, 'problems', where),
+        queryRecords<SubmissionData>(env, 'submissions', where),
+        queryRecords<ClusterData>(env, 'clusters', where),
+        queryRecords<PracticeSetData>(env, 'practiceSets', where),
+      ])
+      return buildSessionReport(session, problems, submissions, clusters, practiceSets)
+    },
+  })
 }
 
 // ============================================================================
