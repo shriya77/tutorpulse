@@ -10,6 +10,7 @@ export type SessionData = {
   joinCode?: string
   status: SessionStatus
   currentProblemId?: string
+  topic?: string
   focusLabel?: string
   participantIds: string[]
   clusterRuns: number

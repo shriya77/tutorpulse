@@ -42,9 +42,10 @@ test('clustering evaluation on the demo problems', async ({ users }) => {
   const { token } = (await (await tutor.context.request.post('/api/auth/token')).json()) as { token: string }
   const auth = { Authorization: `Bearer ${token}` }
   const model = process.env.EVAL_MODEL
+  const topic = process.env.EVAL_TOPIC // e.g. math2413-w4: give the AI that week's misconception library
 
   const seeded = (await (
-    await tutor.context.request.post('/api/actions/testClusterEval', { headers: auth, data: { problems: DEMO_PROBLEMS, model } })
+    await tutor.context.request.post('/api/actions/testClusterEval', { headers: auth, data: { problems: DEMO_PROBLEMS, model, topic } })
   ).json()) as { success: boolean; data?: { sessionId: string; problemIds: string }; error?: string }
   expect(seeded.success, seeded.error).toBe(true)
   const { sessionId, problemIds } = seeded.data!
@@ -63,7 +64,7 @@ test('clustering evaluation on the demo problems', async ({ users }) => {
       .poll(async () => (await query('problems', { sessionId })).every((p) => p.data.clusterState === 'idle'), { timeout: 240_000, intervals: [3_000] })
       .toBe(true)
 
-    const report: string[] = [`set: ${process.env.EVAL_SET ?? 'chain-rule-demo'} · model: ${model ?? 'default (claude-haiku-5-5)'}`]
+    const report: string[] = [`set: ${process.env.EVAL_SET ?? 'chain-rule-demo'} · model: ${model ?? 'default (claude-haiku-5-5)'} · topic: ${topic ?? 'none'}`]
     const scores: number[] = []
     for (const [i, problemId] of problemIds.split(',').entries()) {
       const demo = DEMO_PROBLEMS[i]

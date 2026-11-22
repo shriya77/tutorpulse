@@ -24,11 +24,13 @@ export interface ClusterPromptInput {
   expectedMistakes?: string
   existingLabels: string[]
   submissions: Array<{ id: string; answer: string; explanation: string }>
+  /** The session topic's known misconceptions (src/ai/misconceptions), if the tutor picked a week. */
+  topicMisconceptions?: string[]
 }
 
 export const CLUSTER_INSTRUCTIONS = `You are an experienced maths tutor glancing at a live board during a group session. Wrong answers are arriving. Sort them by the MISTAKE IN THINKING behind them, so the tutor can teach the biggest misunderstanding to the whole room in the next minute.
 
-You get one problem, its correct answer, the tutor's own note on mistakes they expect, labels already on the board, and the wrong submissions (final answer + the student's one-line "how I got it").
+You get one problem, its correct answer, the tutor's own note on mistakes they expect, labels already on the board, the wrong submissions (final answer + the student's one-line "how I got it"), and sometimes "knownMisconceptions": a list PLTL leaders wrote of common mistakes for this week's topic.
 
 How to group
 - Group by the idea the student got wrong, using both the answer and the explanation. Different-looking answers can share one mistake (cos(3x^2) and "cos 3x^2" are the same slip).
@@ -36,6 +38,7 @@ How to group
 - Use "Other" only for blank, off-topic or unreadable answers.
 - Every submission id appears in exactly one group. Never invent ids. Never output an empty group.
 - If a label in existingLabels still fits a group, reuse it word for word so the board does not reshuffle.
+- If knownMisconceptions is given and a group clearly matches one of its entries, phrase the label in that entry's words (shortened to fit). Still group by what the answers actually show; never force answers into a listed mistake that does not fit them, and most entries will not apply to this problem.
 
 How to write the label (this is what the tutor reads aloud)
 - Aim for 2 to 5 words; 6 is a hard maximum, so count the words before answering (maths like "e^(x^2)" or "×6x" counts as one word). Plain words a tutor would say to the class, naming the actual maths where it helps: "Forgot the ×6x" (3), "Thinks sin′ is −cos" (4), "Kept the power at 5" (5).
@@ -63,6 +66,8 @@ export function buildClusterPrompt(input: ClusterPromptInput): string {
       tutorExpectedMistakes: input.expectedMistakes || null,
       existingLabels: input.existingLabels,
       wrongSubmissions: input.submissions,
+      // Last, so a long reference list doesn't crowd out the answers being grouped.
+      knownMisconceptions: input.topicMisconceptions?.length ? input.topicMisconceptions : undefined,
     },
     null,
     1,
@@ -70,7 +75,7 @@ export function buildClusterPrompt(input: ClusterPromptInput): string {
 }
 
 /** Extra turn after a failed validation, telling the model exactly what to fix. */
-export function buildRetryNote(reason: string, labels: string[] = []): string {
+export function buildRetryNote(reason: string, labels: string[] = [], validIds: string[] = []): string {
   const tooLong = labels
     .map((l) => ({ l, n: l.trim().split(/\s+/).filter(Boolean).length }))
     .filter((x) => x.n > 6)
@@ -78,6 +83,7 @@ export function buildRetryNote(reason: string, labels: string[] = []): string {
   return [
     `Your previous answer was rejected: ${reason}.`,
     tooLong.length ? `Shorten these labels to at most 6 words, keeping the meaning: ${tooLong.join(', ')}.` : '',
+    reason.startsWith('ids:') && validIds.length ? `The only valid submission ids are: ${validIds.join(', ')}. Use each exactly once.` : '',
     'Return the full corrected result: every submission id exactly once, every label at most 6 words.',
   ]
     .filter(Boolean)

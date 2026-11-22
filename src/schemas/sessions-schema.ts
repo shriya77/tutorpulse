@@ -23,6 +23,8 @@ export const sessionsSchema: CollectionSchema = {
       default: 'draft',
     },
     { name: 'currentProblemId', storage: 'text', interpretation: 'plain' },
+    /** Optional PLTL week (src/lib/topics.ts); its misconception list guides cluster labels. */
+    { name: 'topic', storage: 'text', interpretation: 'plain' },
     /** Misconception currently "on the board"; shown as a banner to students. */
     { name: 'focusLabel', storage: 'text', interpretation: 'plain' },
     { name: 'participantIds', storage: 'text', interpretation: { kind: 'json' }, default: [] },
@@ -40,7 +42,7 @@ export const sessionsSchema: CollectionSchema = {
       create: true,
       update: 'own',
       delete: 'own',
-      writableFields: ['title', 'currentProblemId', 'focusLabel'],
+      writableFields: ['title', 'topic', 'currentProblemId', 'focusLabel'],
     },
     admin: ADMIN_ALL,
   },

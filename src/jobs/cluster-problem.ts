@@ -26,6 +26,7 @@ import type { ClusterJobPayload } from '../actions/clustering-trigger'
 import { buildClusterPrompt, buildRetryNote, CLUSTER_INSTRUCTIONS } from '../ai/prompts/cluster'
 import { clusterOutputSchema, fallbackClusters, validateClusters, type ValidCluster } from '../lib/clusters'
 import { MAX_CLUSTER_RUNS_PER_SESSION } from '../lib/limits'
+import { misconceptionsFor } from '../ai/misconceptions/math2413'
 
 export const CLUSTER_MODEL = 'claude-haiku-5-5'
 /** Models the evaluation may compare; anything else falls back to CLUSTER_MODEL. */
@@ -82,41 +83,53 @@ export async function runClusterJob(payload: ClusterJobPayload, ctx: JobContext,
         await records.update('sessions', session.recordId, { clusterRuns: (session.data.clusterRuns ?? 0) + 1 })
         ctx.progress(0.3, 'Grouping wrong answers')
         const ai = createDeepSpaceAI(env, 'anthropic') // owner-billed: no authToken
-        const prompt = buildClusterPrompt({
+        const library = misconceptionsFor(session.data.topic)
+        const baseInput = {
           problemPrompt: problem.data.prompt,
           answerKey: key.data.answer,
           expectedMistakes: key.data.expectedMistakes,
           existingLabels: [...new Set(existing.map((c) => c.data.label))],
           submissions: wrong.map((s) => ({ id: s.recordId, answer: s.data.answer, explanation: s.data.explanation ?? '' })),
-        })
+        }
 
-        const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [{ role: 'user', content: prompt }]
-        // Up to 2 attempts; a 3rd only when the sole problem left is label length
-        // (the grouping is fine and a rewrite is cheap — see docs/AGENT_LOG.md).
-        for (let attempt = 0; source === 'none' && (attempt < 2 || (attempt === 2 && reason?.startsWith('label:'))); attempt++) {
-          try {
-            const r = await generateText({
-              model: ai(payload.model && EVAL_MODELS.includes(payload.model) ? payload.model : CLUSTER_MODEL),
-              instructions: CLUSTER_INSTRUCTIONS,
-              messages,
-              output: Output.object({ schema: clusterOutputSchema }),
-              maxOutputTokens: 2000,
-              abortSignal: AbortSignal.any([ctx.signal, AbortSignal.timeout(60_000)]),
-            })
-            const v = validateClusters(r.output, wrongIds)
-            if (v.ok) {
-              clusters = v.clusters
-              source = attempt === 0 ? 'ai' : 'ai_retry'
-              reason = undefined
-            } else {
+        // One conversation: the model's answer, then a retry note naming what to fix.
+        const runAttempts = async (withLibrary: boolean, maxAttempts: number) => {
+          const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
+            { role: 'user', content: buildClusterPrompt(withLibrary ? { ...baseInput, topicMisconceptions: library } : baseInput) },
+          ]
+          for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            // A 3rd attempt only when the sole problem left is label length.
+            if (attempt === 2 && !reason?.startsWith('label:')) return
+            try {
+              const r = await generateText({
+                model: ai(payload.model && EVAL_MODELS.includes(payload.model) ? payload.model : CLUSTER_MODEL),
+                instructions: CLUSTER_INSTRUCTIONS,
+                messages,
+                output: Output.object({ schema: clusterOutputSchema }),
+                maxOutputTokens: 2000,
+                abortSignal: AbortSignal.any([ctx.signal, AbortSignal.timeout(60_000)]),
+              })
+              const v = validateClusters(r.output, wrongIds)
+              if (v.ok) {
+                clusters = v.clusters
+                source = attempt === 0 && withLibrary === library.length > 0 ? 'ai' : 'ai_retry'
+                reason = undefined
+                return
+              }
               reason = v.reason
               const labels = (r.output?.clusters ?? []).map((c) => c.label)
-              messages.push({ role: 'assistant', content: JSON.stringify(r.output) }, { role: 'user', content: buildRetryNote(v.reason, labels) })
+              messages.push({ role: 'assistant', content: JSON.stringify(r.output) }, { role: 'user', content: buildRetryNote(v.reason, labels, wrongIds) })
+            } catch (e) {
+              reason = `ai_error: ${e instanceof Error ? e.message.slice(0, 200) : 'unknown'}`
             }
-          } catch (e) {
-            reason = `ai_error: ${e instanceof Error ? e.message.slice(0, 200) : 'unknown'}`
           }
         }
+
+        await runAttempts(library.length > 0, 3)
+        // The topic library improves wording but can unsettle hard problems
+        // (docs/AGENT_LOG.md). If it didn't work, try once without it, the
+        // path proven in the evals, before falling back to identical answers.
+        if (source === 'none' && library.length > 0) await runAttempts(false, 2)
       }
       if (source === 'none') {
         clusters = fallbackClusters(wrong.map((s) => ({ id: s.recordId, answer: s.data.answer })))

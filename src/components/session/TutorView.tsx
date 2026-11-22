@@ -17,6 +17,7 @@ import { ProblemEditor } from './ProblemEditor'
 import { JoinQr } from './JoinQr'
 import { NotesPanel } from './NotesPanel'
 import { PracticeSetPanel } from './PracticeSetPanel'
+import { TopicPicker } from './TopicPicker'
 import { TutorRoster } from './TutorRoster'
 
 export function TutorView({ session }: { session: Envelope<SessionData> }) {
@@ -30,6 +31,7 @@ export function TutorView({ session }: { session: Envelope<SessionData> }) {
     return (
       <div className="space-y-6">
         <OpenSessionBar session={session} problemCount={problems.length} missingKeys={problems.filter((p) => !byProblem.has(p.recordId)).length} />
+        <TopicPicker session={session} />
         <ProblemEditor sessionId={session.recordId} problems={problems} keys={byProblem} />
         <NotesPanel sessionId={session.recordId} />
       </div>
@@ -47,6 +49,7 @@ export function TutorView({ session }: { session: Envelope<SessionData> }) {
           {editing ? 'Done editing problems' : 'Edit problems'}
         </Button>
         {editing && <ProblemEditor sessionId={session.recordId} problems={problems} keys={byProblem} />}
+        {editing && session.data.status === 'open' && <TopicPicker session={session} />}
         {editing && session.data.status === 'open' && <NotesPanel sessionId={session.recordId} />}
       </section>
     </div>

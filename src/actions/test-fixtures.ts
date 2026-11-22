@@ -117,6 +117,7 @@ const clusterEval: ActionHandler<Env> = async ({ userId, params, tools, env }) =
   }
   const sessionId = await created(tools, 'sessions', {
     title: `${TEST_TITLE_PREFIX}${Date.now()}__ clustering eval`,
+    topic: typeof params.topic === 'string' ? params.topic : '',
     status: 'open',
     joinCode: '',
     participantIds: [],
