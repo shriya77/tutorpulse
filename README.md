@@ -124,7 +124,9 @@ npx deepspace dev start           # local dev server (Vite + Workers runtime)
 
 ```bash
 npm run test:unit                 # 100+ Vitest tests: answer checking (T6), cluster validation (T7), guards, schemas
-npx deepspace test run all        # Playwright, local: T1–T5, walkthrough, phone layout
+npx deepspace test run all        # Playwright, local: T1–T5, T8 (working privacy), walkthrough, phone layout
+RUN_AI_TESTS=1 npx deepspace test run tests/whiteboard.spec.ts   # pad → tutor thumbnail, one small AI call
+RUN_AI_EVAL=1 EVAL_SET=working [EVAL_NO_IMAGES=1] npx deepspace test run tests/clustering-eval.spec.ts
 ```
 
 The multi-user specs need test accounts. The first one created is used as the tutor:
@@ -172,6 +174,15 @@ npx deepspace agent invoke tutorpulse sessionReport          # your most recent 
 4. **Revise:** **Re-open answers**; a student fixes their answer and the cluster count falls.
 5. **Wrap up:** **End session** → **Generate practice set** (about a minute) → **Download to review** → **Share with students** → students download the PDF. (Generation is a deliberate click rather than automatic, so AI credits are only spent when the tutor wants a set.)
 
+## Whiteboard: grouping by the working, not just the answer
+
+Students can write their steps on a sketch pad under each problem (finger, stylus or mouse; pen, eraser, undo, clear). The typed final answer still decides right or wrong, so counts stay exact. The drawing only changes *why* a wrong answer is grouped where it is:
+
+- **Storage and privacy.** The pad exports an 800 px PNG into the student's **private** folder (`useR2Files`, scope `self`, one key per problem, so revisions replace it). `submitAnswer` re-reads that key from the caller's own folder and checks it is a small PNG before storing `submissions.workKey`, so a student can't attach anyone else's file. The image leaves the folder only through `GET /api/submissions/:id/work`, which answers the student who wrote it and the session's tutor (404 for everyone else). Covered by `tests/work-privacy.spec.ts` (T8).
+- **Clustering.** The job attaches up to 12 working images (newest first) labelled with their submission ids, and the prompt tells Claude to group by the first step where the working goes wrong.
+- **Tutor view.** Each group's "Show answers" includes the working as a thumbnail; tap to enlarge.
+- **Does it help?** On a set built the way real rooms look (vague notes; one wrong answer, 7/(x−3)², reached by two different mistakes), agreement with the intended groups was **0.92 without the images and 1.00 with them** (`docs/clustering-eval/5-…`, `6-…`; one run each, so treat it as a sign, not a benchmark). The eval images are typed text in a handwriting font (`docs/clustering-eval/sample-working.png`), not real handwriting.
+
 ## Known limitations / next steps
 
 - Answers are checked only when they're expressions in **x**; anything else is "needs review" and goes to clustering as raw text.
@@ -179,4 +190,5 @@ npx deepspace agent invoke tutorpulse sessionReport          # your most recent 
 - Joining is a read-modify-write on a JSON list, retried until the student is present. A burst of simultaneous joins is very unlikely to lose one, but it isn't impossible.
 - If tutor notes contain worked solutions, the hint assistant could quote them (the upload panel warns).
 - `problems` are readable by every signed-in user (prompts aren't secret); private problem banks would need a per-session room.
-- Next: session history and per-student trends, handwriting/photo answers, a weekly misconception digest, LMS export.
+- The whiteboard hasn't been tried with real students' handwriting yet; messy writing will be harder to read than the eval images. Only the newest 12 drawings per run are sent to the AI.
+- Next: session history and per-student trends, photo uploads of paper working, a weekly misconception digest, LMS export.
