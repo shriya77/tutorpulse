@@ -111,7 +111,14 @@ Refs: docs `/guides/background-jobs` ("Handlers run as the app owner"), `/guides
 - Retries: `maxAttempts` per enqueue (default 1). 15-minute alarm limit; `backgroundJobTypes` for
   longer jobs.
 
-## Q4. Does the knowledge binding index PDFs directly, or does text need extracting first? — **Unverified**
+## Q4. Does the knowledge binding index PDFs directly, or does text need extracting first? — **Verified (Phase 3): directly**
+
+**Answer:** a real 30 KB PDF uploaded as notes reached `completed` ("Ready for hints") in about 1.7 minutes on
+the live app, with no text extraction (`tests/notes-pdf.spec.ts`). A `.md` file indexed the same way, and the
+hint assistant's `search_notes` quoted it ("Your tutor's notes say to differentiate the outside first…").
+Not verified: how well text is extracted from scanned or image-only PDFs. The 4 MiB cap still applies.
+
+Earlier notes:
 
 Refs: docs `/bindings/knowledge`; `worker.d.ts` `knowledge`, `KnowledgeClient`, `ScopedKnowledgeClient`.
 
@@ -128,7 +135,13 @@ Refs: docs `/bindings/knowledge`; `worker.d.ts` `knowledge`, `KnowledgeClient`, 
   `list({ status })`. Fallback if PDFs come back `error` / `skipped`: accept `.txt`/`.md` only, or
   extract text in the sandbox job.
 
-## Q5. Rendering KaTeX inside the AI chat panel — **Confirmed (needs a decision in Phase 3)**
+## Q5. Rendering KaTeX inside the AI chat panel — **Done (Phase 3)**
+
+**Answer:** with your approval, `npx deepspace add ai-chat` plus `remark-math` and `rehype-katex` added to the
+ChatPanel's Markdown plugin lists (`src/components/ChatPanel.messages.tsx`). Hints render `$…$` maths
+(screenshot `test-results/phase3-3-hints.png`). Hints are owner-billed and capped at 200 turns per session.
+
+Earlier notes:
 
 Refs: docs `/guides/ai-chat` ("Install the chat feature", "Custom chat UI").
 
@@ -208,3 +221,16 @@ Refs: docs `/guides/ai-chat` ("Install the chat feature", "Custom chat UI").
   can't read. The caller needs a `users` row first: one app page visit creates it.
 - Test-account emails are global across all DeepSpace developers. Use a unique suffix.
   `--password-stdin` only accepts a piped password.
+
+## Verified in Phase 3
+
+- Presence rooms admit anyone who connects. TutorPulse's presence route (`src/server/realtime-routes.ts`)
+  now only accepts `session:<id>` scopes, and only that session's tutor and joined students (T5 checks 403 for
+  a stranger, 401 with no token).
+- `[[ai_search]]` in `wrangler.toml` makes local Vite try to proxy the binding to Cloudflare and fail without
+  `CLOUDFLARE_API_TOKEN`. `remoteBindings: false` in `vite.config.ts` fixes it. `knowledge(env)` goes through the
+  DeepSpace platform, and notes indexing and search work under local dev too.
+- `useR2Files().upload` returns the full stored `key`, which is what `appFiles().download` expects (as with
+  sandbox outputs in Phase 0).
+- The SDK's `ai-chats` / `ai-messages` schemas don't declare a `'*'` rule. TutorPulse wraps them with an explicit
+  deny (`src/schemas/ai-chat-schema.ts`).
