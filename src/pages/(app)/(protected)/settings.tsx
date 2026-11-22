@@ -23,11 +23,11 @@ export default function SettingsPage() {
           <dl className="space-y-3 text-sm">
             <div>
               <dt className="text-muted-foreground">Name</dt>
-              <dd className="text-foreground">{user?.name ?? '—'}</dd>
+              <dd className="text-foreground">{user?.name ?? 'Not set'}</dd>
             </div>
             <div>
               <dt className="text-muted-foreground">Email</dt>
-              <dd className="text-foreground">{user?.email ?? '—'}</dd>
+              <dd className="text-foreground">{user?.email ?? 'Not set'}</dd>
             </div>
           </dl>
 

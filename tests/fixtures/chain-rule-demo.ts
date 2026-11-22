@@ -8,7 +8,7 @@
  * Answers and explanations are written the way students actually type them.
  */
 
-export const DEMO_TITLE = 'Calc I — Chain Rule Review'
+export const DEMO_TITLE = 'Calc I: Chain Rule Review'
 
 export interface DemoResponse {
   answer: string

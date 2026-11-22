@@ -40,6 +40,11 @@ export interface ValidCluster {
 
 export type ValidationResult = { ok: true; clusters: ValidCluster[] } | { ok: false; reason: string }
 
+/** House style: no em/en dashes in anything students or tutors read. */
+export function stripDashes(text: string): string {
+  return text.replace(/\s*[—–]\s*/g, ', ').replace(/,\s*,/g, ',').trim()
+}
+
 export function wordCount(label: string): number {
   return label.trim().split(/\s+/).filter(Boolean).length
 }
@@ -56,7 +61,7 @@ export function validateClusters(output: unknown, wrongIds: readonly string[]): 
 
   for (const c of parsed.data.clusters) {
     if (c.submissionIds.length === 0) continue // repair: drop empty clusters
-    const label = c.label.trim()
+    const label = stripDashes(c.label)
     const words = wordCount(label)
     if (words === 0) return { ok: false, reason: 'label: empty label' }
     if (words > MAX_LABEL_WORDS) return { ok: false, reason: `label: "${label}" has ${words} words (max ${MAX_LABEL_WORDS})` }
@@ -67,7 +72,7 @@ export function validateClusters(output: unknown, wrongIds: readonly string[]): 
       if (seen.has(id)) return { ok: false, reason: `ids: submission ${id} appears more than once` }
       seen.add(id)
     }
-    clusters.push({ label, explanation: c.explanation.trim(), submissionIds: [...c.submissionIds] })
+    clusters.push({ label, explanation: stripDashes(c.explanation), submissionIds: [...c.submissionIds] })
   }
 
   const missing = wrongIds.filter((id) => !seen.has(id))

@@ -64,6 +64,9 @@ describe('checkAnswer (T6)', () => {
     expect(checkAnswer('2cos(x)', '2*cos(x)').verdict).toBe('correct')
     expect(checkAnswer('exp(x)', 'e^x').verdict).toBe('correct')
     expect(checkAnswer('xy', 'x').verdict).toBe('needs_review') // y isn't allowed
+    expect(checkAnswer('x(x^2+2)^(-1/2)', 'x/sqrt(x^2+2)').verdict).toBe('correct') // x(…) is multiplication
+    expect(checkAnswer('2e(x+1)', '2*e*(x+1)').verdict).toBe('correct')
+    expect(checkAnswer('exp(x)', 'e^x').verdict).toBe('correct') // a real function call is untouched
   })
 
   it('treats an unparsable answer key as a tutor problem, not a student one', () => {

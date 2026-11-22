@@ -128,7 +128,7 @@ function NewSessionCard() {
         data-testid="new-session-title"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="e.g. Calc I — Chain Rule Review"
+        placeholder="e.g. Calc I: Chain Rule Review"
         maxLength={120}
       />
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}

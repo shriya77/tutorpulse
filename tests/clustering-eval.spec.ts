@@ -11,7 +11,11 @@
  */
 import { writeFileSync } from 'node:fs'
 import { test, expect, loadAllTestAccounts } from 'deepspace/testing'
-import { DEMO_PROBLEMS } from './fixtures/chain-rule-demo'
+import { DEMO_PROBLEMS as CHAIN_RULE } from './fixtures/chain-rule-demo'
+import { PLTL_WEEK4_PROBLEMS } from './fixtures/pltl-week4'
+
+/** EVAL_SET=pltl-week4 evaluates real PLTL Week 4 problems instead of the chain-rule demo. */
+const DEMO_PROBLEMS = process.env.EVAL_SET === 'pltl-week4' ? PLTL_WEEK4_PROBLEMS : CHAIN_RULE
 
 test.skip(process.env.RUN_AI_EVAL !== '1', 'Set RUN_AI_EVAL=1 to run the (AI-billed) clustering evaluation.')
 test.skip(loadAllTestAccounts().length < 1, 'Needs 1 usable test account.')
@@ -59,7 +63,7 @@ test('clustering evaluation on the demo problems', async ({ users }) => {
       .poll(async () => (await query('problems', { sessionId })).every((p) => p.data.clusterState === 'idle'), { timeout: 240_000, intervals: [3_000] })
       .toBe(true)
 
-    const report: string[] = [`model: ${model ?? 'default (claude-haiku-5-5)'}`]
+    const report: string[] = [`set: ${process.env.EVAL_SET ?? 'chain-rule-demo'} · model: ${model ?? 'default (claude-haiku-5-5)'}`]
     const scores: number[] = []
     for (const [i, problemId] of problemIds.split(',').entries()) {
       const demo = DEMO_PROBLEMS[i]

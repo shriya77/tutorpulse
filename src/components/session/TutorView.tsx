@@ -5,7 +5,7 @@
  * reload (F8, F9).
  */
 
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useMutations } from 'deepspace'
 import { Badge, Button } from '@/components/ui'
 import type { ClusterData, Envelope, ProblemData, SessionData, SubmissionData } from '../../actions/types'
@@ -155,19 +155,27 @@ function Board({ session, problems }: { session: Envelope<SessionData>; problems
     return m
   }, [submissions])
 
-  const clustersByProblem = useMemo(() => {
-    const m = new Map<string, Envelope<ClusterData>[]>()
-    for (const c of clusters as Envelope<ClusterData>[]) m.set(c.data.problemId, [...(m.get(c.data.problemId) ?? []), c])
-    for (const list of m.values()) {
-      list.sort((a, b) => Number(a.data.label === OTHER_LABEL) - Number(b.data.label === OTHER_LABEL) || b.data.count - a.data.count)
-    }
-    return m
-  }, [clusters])
-
   const submissionById = useMemo(
     () => new Map((submissions as Envelope<SubmissionData>[]).map((s) => [s.recordId, s])),
     [submissions],
   )
+  // A cluster's members that are STILL wrong. When a student revises to a
+  // correct answer they leave their group at once; the AI re-run then tidies
+  // labels. This keeps the board honest between clustering runs.
+  const liveCount = useCallback(
+    (c: Envelope<ClusterData>) => (c.data.submissionIds ?? []).filter((id) => submissionById.get(id)?.data.isCorrect === 0).length,
+    [submissionById],
+  )
+
+  const clustersByProblem = useMemo(() => {
+    const m = new Map<string, Envelope<ClusterData>[]>()
+    for (const c of clusters as Envelope<ClusterData>[]) m.set(c.data.problemId, [...(m.get(c.data.problemId) ?? []), c])
+    for (const list of m.values()) {
+      list.sort((a, b) => Number(a.data.label === OTHER_LABEL) - Number(b.data.label === OTHER_LABEL) || liveCount(b) - liveCount(a))
+    }
+    return m
+  }, [clusters, liveCount])
+
 
   return (
     <ol className="space-y-4" aria-label="Misconception radar">
@@ -288,10 +296,12 @@ function ClusterItem({
   const sessions = useMutations<Partial<SessionData>>('sessions')
   const [open, setOpen] = useState(false)
   const onBoard = session.data.focusLabel === cluster.data.label
+  // Only answers that are still wrong count (see liveCount in Board).
   const answers = (cluster.data.submissionIds ?? [])
     .map((id) => submissionById.get(id))
-    .filter((s): s is Envelope<SubmissionData> => !!s)
+    .filter((s): s is Envelope<SubmissionData> => !!s && s.data.isCorrect === 0)
   const panelId = `cluster-answers-${cluster.recordId}`
+  if (answers.length === 0) return null // everyone in this group has revised
 
   return (
     <li
@@ -300,8 +310,8 @@ function ClusterItem({
     >
       <div className="flex items-baseline justify-between gap-3">
         <span className="font-medium text-foreground" data-testid="cluster-label">{cluster.data.label}</span>
-        <span className="hl font-display text-2xl font-semibold text-foreground" data-testid="cluster-count" aria-label={`${cluster.data.count} students`}>
-          {cluster.data.count}
+        <span className="hl font-display text-2xl font-semibold text-foreground" data-testid="cluster-count" aria-label={`${answers.length} students`}>
+          {answers.length}
         </span>
       </div>
       {cluster.data.explanation && <p className="mt-0.5 text-sm text-muted-foreground">{cluster.data.explanation}</p>}
@@ -323,11 +333,10 @@ function ClusterItem({
       </div>
       {open && (
         <ul id={panelId} className="mt-2 space-y-1 border-t border-border pt-2" data-testid="cluster-answers">
-          {answers.length === 0 && <li className="text-sm text-muted-foreground">These answers were revised.</li>}
           {answers.map((s) => (
             <li key={s.recordId} className="text-sm">
               <code className="font-mono text-foreground">{s.data.answer}</code>
-              {s.data.explanation && <span className="text-muted-foreground"> — “{s.data.explanation}”</span>}
+              {s.data.explanation && <span className="text-muted-foreground">: “{s.data.explanation}”</span>}
             </li>
           ))}
         </ul>

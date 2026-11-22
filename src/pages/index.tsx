@@ -27,7 +27,7 @@ export default function Landing() {
           </h1>
           <p className="max-w-xl text-lg text-muted-foreground">
             A live room for group tutoring. Seven students write cos(3x²) for d/dx sin(3x²)? Your board says
-            “Dropped the inner derivative — 7” within seconds, so one explanation fixes most of the room.
+            “Dropped the inner derivative: 7” within seconds, so one explanation fixes most of the room.
           </p>
           <div className="flex flex-wrap gap-3 pt-2">
             <Link

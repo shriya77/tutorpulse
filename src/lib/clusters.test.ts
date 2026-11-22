@@ -79,6 +79,16 @@ describe('validateClusters (T7)', () => {
   })
 })
 
+describe('house style', () => {
+  it('removes em and en dashes from labels and explanations', () => {
+    const r = validateClusters(
+      { clusters: [{ label: 'Forgot the ×6x — inside', explanation: 'Wrote cos(3x^2) – no 6x. Try asking: why?', submissionIds: ['s1'] }] },
+      ['s1'],
+    )
+    expect(r.ok && r.clusters[0]).toMatchObject({ label: 'Forgot the ×6x, inside', explanation: 'Wrote cos(3x^2), no 6x. Try asking: why?' })
+  })
+})
+
 describe('fallbackClusters', () => {
   it('groups identical answers, ignoring case, spacing and unicode dots', () => {
     const clusters = fallbackClusters([

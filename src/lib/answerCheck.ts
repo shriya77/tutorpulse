@@ -79,6 +79,8 @@ export function normalizeExpression(raw: string): string {
     s = s.replace(new RegExp(`\\b${alias}\\s*\\(`, 'g'), `${name}(`)
   }
   s = s.replace(/[A-Za-z]+/g, (run) => splitLetters(run) ?? run)
+  // A variable/constant directly before "(" means multiply: `x(x^2+2)` is x·(x²+2), not a call.
+  s = s.replace(/(?<![A-Za-z])(x|e|pi)\s*\(/g, '$1*(')
   // A number or closing paren directly before a function name: `2cos(x)`, `(x)sin(x)`.
   s = s.replace(new RegExp(`([0-9)])\\s*(${FUNCTION_NAMES})\\s*\\(`, 'g'), '$1*$2(')
   return s.trim()

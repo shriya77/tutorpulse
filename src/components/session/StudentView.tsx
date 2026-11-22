@@ -86,7 +86,7 @@ export function StudentView({ session }: { session: Envelope<SessionData> }) {
             onClick={() => setStuck((v) => !v)}
             data-testid="stuck-button"
           >
-            {stuck ? 'Tutor notified — tap if you’re unstuck' : 'I’m stuck'}
+            {stuck ? 'Tutor notified. Tap again when you’re unstuck' : 'I’m stuck'}
           </Button>
           {userId && <HintPanel userId={userId} />}
         </>

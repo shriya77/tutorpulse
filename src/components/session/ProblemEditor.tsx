@@ -161,7 +161,7 @@ function ProblemRow({
         <div className="space-y-2">
           <div className="text-lg text-foreground"><MathText source={problem.data.prompt} display /></div>
           <p className="text-sm text-muted-foreground">
-            Answer: <code className="font-mono text-foreground">{answerKey?.data.answer ?? 'missing — add one'}</code>
+            Answer: <code className="font-mono text-foreground">{answerKey?.data.answer ?? 'missing, add one'}</code>
           </p>
         </div>
       )}
