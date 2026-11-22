@@ -1,0 +1,68 @@
+model: default (claude-haiku-5-5)
+
+Problem 1: \frac{d}{dx}\sin(3x^2)  (key 6x*cos(3x^2))
+  14 answers, 2 correct · 5 clusters vs 5 intended · agreement 1.00
+  ● Forgot the ×6x — 5
+      Differentiated only the outer sin, giving answers like cos(3x^2) with no inner derivative. Try asking: what does the chain rule say to multiply by when the inside is 3x^2?
+      · cos(3x^2)        "outside function first, inside stays the same"  [no-inner-derivative]
+      · cos 3x^2         "d/dx sin u = cos u"  [no-inner-derivative]
+      · cos(3x^2)        "just took the derivative of the sin part"  [no-inner-derivative]
+      · cos(3x²)         "sin goes to cos"  [no-inner-derivative]
+      · cos(3x^2)        "derivative of sin is cos"  [no-inner-derivative]
+  ● Took inside derivative only — 3
+      Differentiated the inside 3x^2 and dropped the outer sin, giving answers like 6x or cos(6x). Try asking: what happens to the sin function itself when you differentiate?
+      · 6x               "derivative of 3x^2 is 6x"  [differentiated-inside-of-function]
+      · cos(6x)          "differentiate whats in the brackets then cos"  [differentiated-inside-of-function]
+      · cos(6x)          "took the derivative of the inside first"  [differentiated-inside-of-function]
+  ● Thinks sin′ is −cos — 2
+      Believes the derivative of sin is negative cos, giving answers like -6x*cos(3x^2). Try asking: what is the derivative of sin(x), and does the minus sign belong there?
+      · -cos(3x^2)*6x    "sin -> -cos then times 6x"  [sign-error]
+      · -6x*cos(3x^2)    "derivative of sin is negative cos"  [sign-error]
+  ● Other — 1
+      Blank or unhelpful answer with no working shown. Try asking: where did you get stuck on this one?
+      · idk              ""  [other]
+  ● Kept sin instead of cos — 1
+      Multiplied by 6x but left the outer function as sin, giving 6x*sin(3x^2). Try asking: after differentiating, which trig function should appear in front?
+      · 6x*sin(3x^2)     "multiply by the derivative of the inside"  [kept-outer-function]
+
+Problem 2: \frac{d}{dx}(2x+1)^5  (key 10*(2x+1)^4)
+  11 answers, 2 correct · 4 clusters vs 4 intended · agreement 1.00
+  ● Forgot the ×2 from inside — 4
+      Brought the 5 down and dropped the inner derivative, e.g. 5(2x+1)^4, so the factor 2 is missing. Try asking: what is the derivative of the inside, 2x+1, and where does it go?
+      · 5(2x+1)^4        "same as x^5 but with 2x+1"  [no-inner-derivative]
+      · 5*(2x+1)^4       "bring down the power and subtract 1"  [no-inner-derivative]
+      · 5(2x+1)^4        "n times x to the n-1"  [no-inner-derivative]
+      · 5(2x+1)^4        "power rule, bring the 5 down"  [no-inner-derivative]
+  ● Thinks inside derivative is 2x — 2
+      Multiplied by the inside's derivative but wrote it as 2x, e.g. 10x(2x+1)^4, instead of the constant 2. Try asking: if the inside is 2x+1, what is its rate of change, and does x appear in it?
+      · 10x(2x+1)^4      "derivative of 2x+1 is 2x"  [wrong-inner-derivative]
+      · 5(2x+1)^4*2x     "times the derivative of the inside"  [wrong-inner-derivative]
+  ● Kept the power at 5 — 2
+      Multiplied by the 2 and 5 but left the exponent as 5, e.g. 10(2x+1)^5. Try asking: after the power rule, what should the exponent on (2x+1) be?
+      · 5*2*(2x+1)^5     "chain rule gives the 2"  [exponent-not-lowered]
+      · 10(2x+1)^5       "multiply by 5 and by 2"  [exponent-not-lowered]
+  ● Treats (2x+1)^5 as (2x)^5 — 1
+      One student expanded the bracket wrongly by dropping the +1, giving 32x^5. Try asking: what is (2x+1)^5 when you expand only the 2x term and keep the +1?
+      · 32x^5            "expanded it first"  [other]
+
+Problem 3: \frac{d}{dx}e^{x^2}  (key 2x*e^(x^2))
+  11 answers, 2 correct · 4 clusters vs 4 intended · agreement 1.00
+  ● Thinks e^(x^2) stays the same — 4
+      Treats the whole expression as its own derivative, writing e^(x^2) unchanged, because e^x is its own derivative. Try asking: what is the derivative of e^(u) when u is not just x, and does the chain rule apply?
+      · e^{x^2}          "exponential doesnt change"  [no-inner-derivative]
+      · e^(x^2)          "e stays e"  [no-inner-derivative]
+      · e^(x^2)          "derivative of e to anything is the same"  [no-inner-derivative]
+      · e^(x^2)          "e^x is its own derivative"  [no-inner-derivative]
+  ● Puts the derivative into exponent — 2
+      Differentiates the exponent x^2 and writes the result back inside the exponential, e.g. e^(2x), sometimes multiplied by 2x. Try asking: in e^(x^2), what gets multiplied outside, and what stays inside?
+      · 2x*e^(2x)        "differentiate the exponent, chain rule"  [differentiated-exponent-in-place]
+      · e^(2x)           "the exponent becomes its derivative"  [differentiated-exponent-in-place]
+  ● Brings the power down — 2
+      Applies the power rule to the exponent, lowering the power and subtracting 1, e.g. x^2 e^(x^2-1). Try asking: is the derivative of e^(x^2) using the power rule on the exponent, or on the whole expression?
+      · x^2 e^(x^2-1)    "bring the power down"  [power-rule-on-exponential]
+      · x^2*e^(x^2-1)    "power rule on the exponent"  [power-rule-on-exponential]
+  ● Drops the e^(x^2) part — 1
+      Gives only the derivative of the exponent, 2x, and loses the exponential factor entirely. Try asking: what happens to the e^(x^2) part when you differentiate, and should it disappear?
+      · 2x               "derivative of x^2"  [dropped-the-exponential]
+
+mean agreement: 1.00

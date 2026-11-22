@@ -135,7 +135,8 @@ const clusterEval: ActionHandler<Env> = async ({ userId, params, tools, env }) =
       })
     }
     const problem = await tools.get<ProblemData>('problems', problemId)
-    if (problem.success) await requestClustering(env, tools, problem.data.record as Envelope<ProblemData>)
+    const model = typeof params.model === 'string' ? params.model : undefined
+    if (problem.success) await requestClustering(env, tools, problem.data.record as Envelope<ProblemData>, model)
     problemIds.push(problemId)
   }
   return { success: true, data: { sessionId, problemIds: problemIds.join(',') } }

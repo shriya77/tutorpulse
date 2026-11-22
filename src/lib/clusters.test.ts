@@ -58,8 +58,13 @@ describe('validateClusters (T7)', () => {
     if (!r.ok) expect(r.reason).toMatch(/has 8 words/)
   })
 
-  it('rejects empty clusters, blank labels and duplicate labels', () => {
-    expect(validateClusters({ clusters: [...good.clusters, { label: 'Extra', explanation: '', submissionIds: [] }] }, ids).ok).toBe(false)
+  it('drops empty clusters instead of rejecting the run (seen in real model output)', () => {
+    const r = validateClusters({ clusters: [...good.clusters, { label: 'Extra', explanation: '', submissionIds: [] }] }, ids)
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.clusters.map((c) => c.label)).not.toContain('Extra')
+  })
+
+  it('rejects blank labels and duplicate labels', () => {
     expect(validateClusters({ clusters: [{ label: '  ', explanation: '', submissionIds: ids }] }, ids).ok).toBe(false)
     const twice = { clusters: [
       { label: 'Other', explanation: '', submissionIds: ['s1', 's2'] },
@@ -82,9 +87,10 @@ describe('fallbackClusters', () => {
       { id: 's3', answer: '6x·cos(x^2)' },
       { id: 's4', answer: '6x*cos(x^2)' },
       { id: 's5', answer: 'idk' },
+      { id: 's6', answer: 'cos{3x^2}' },
     ])
     const groups = clusters.map((c) => c.submissionIds.join(',')).sort()
-    expect(groups).toEqual(['s1,s2', 's3,s4', 's5'])
+    expect(groups).toEqual(['s1,s2,s6', 's3,s4', 's5'])
     // Largest groups first; the singleton is last.
     expect(clusters.at(-1)?.submissionIds).toEqual(['s5'])
   })

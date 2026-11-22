@@ -6,8 +6,11 @@
  * Phase 0 spike returned an 8-word label). `validateClusters` enforces the
  * rules in REQUIREMENTS → "Rules of the core loop":
  *   - every wrong submission appears in exactly one cluster ("Other" allowed);
- *   - no unknown ids, no empty clusters;
+ *   - no unknown ids;
  *   - labels are 1–6 words.
+ * One harmless slip is repaired rather than rejected: a cluster with no
+ * submissions is dropped (the model sometimes lists a label it then leaves
+ * empty; rejecting that used to push whole runs onto the fallback).
  * If the model fails twice, `fallbackClusters` groups identical answers, so
  * the tutor's board always shows something.
  */
@@ -52,13 +55,13 @@ export function validateClusters(output: unknown, wrongIds: readonly string[]): 
   const clusters: ValidCluster[] = []
 
   for (const c of parsed.data.clusters) {
+    if (c.submissionIds.length === 0) continue // repair: drop empty clusters
     const label = c.label.trim()
     const words = wordCount(label)
     if (words === 0) return { ok: false, reason: 'label: empty label' }
     if (words > MAX_LABEL_WORDS) return { ok: false, reason: `label: "${label}" has ${words} words (max ${MAX_LABEL_WORDS})` }
     if (labels.has(label.toLowerCase())) return { ok: false, reason: `label: duplicate label "${label}"` }
     labels.add(label.toLowerCase())
-    if (c.submissionIds.length === 0) return { ok: false, reason: `ids: cluster "${label}" is empty` }
     for (const id of c.submissionIds) {
       if (!expected.has(id)) return { ok: false, reason: `ids: unknown submission id ${id}` }
       if (seen.has(id)) return { ok: false, reason: `ids: submission ${id} appears more than once` }
@@ -87,6 +90,8 @@ export function normalizeAnswerText(answer: string): string {
   return answer
     .normalize('NFKC')
     .toLowerCase()
+    .replace(/\{/g, '(')
+    .replace(/\}/g, ')')
     .replace(/[·×∙⋅]/g, '*')
     .replace(/[−–—]/g, '-')
     .replace(/\s+/g, '')

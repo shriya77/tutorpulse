@@ -57,8 +57,11 @@ const FUNCTION_NAMES = [...ALLOWED_FUNCTIONS, ...Object.keys(FUNCTION_ALIASES)]
 /**
  * Turn what a student types into mathjs syntax:
  * - keep only the right-hand side of `dy/dx = …` / `f'(x) = …`;
- * - unicode superscripts, ×, ·, − → ascii;
- * - `6xcos(…)` → `6x*cos(…)` (otherwise mathjs reads `xcos` as a name).
+ * - unicode superscripts, ×, ·, − → ascii; LaTeX-style `{…}` → `(…)`;
+ * - runs of letters are split into the names we allow, so `6xcos(…)` →
+ *   `6x*cos(…)` and `2xe^(x^2)` → `2x*e^(x^2)` (mathjs would otherwise read
+ *   `xcos` / `xe` as one unknown name). A run that can't be split is left
+ *   alone and fails the allowlist later (→ needs_review).
  */
 export function normalizeExpression(raw: string): string {
   let s = raw.trim()
@@ -70,12 +73,31 @@ export function normalizeExpression(raw: string): string {
     .replace(/[−–—]/g, '-')
     .replace(/π/g, 'pi')
     .replace(/\*\*/g, '^')
+    .replace(/\{/g, '(')
+    .replace(/\}/g, ')')
   for (const [alias, name] of Object.entries(FUNCTION_ALIASES)) {
     s = s.replace(new RegExp(`\\b${alias}\\s*\\(`, 'g'), `${name}(`)
   }
-  // Insert * between a variable/number/closing paren and a following function name.
-  s = s.replace(new RegExp(`([0-9x)])\\s*(${FUNCTION_NAMES})\\s*\\(`, 'g'), '$1*$2(')
+  s = s.replace(/[A-Za-z]+/g, (run) => splitLetters(run) ?? run)
+  // A number or closing paren directly before a function name: `2cos(x)`, `(x)sin(x)`.
+  s = s.replace(new RegExp(`([0-9)])\\s*(${FUNCTION_NAMES})\\s*\\(`, 'g'), '$1*$2(')
   return s.trim()
+}
+
+const NAMES = [...ALLOWED_FUNCTIONS, ...ALLOWED_SYMBOLS].sort((a, b) => b.length - a.length)
+
+/** Split a run of letters into allowed names, longest match first ("xcos" → "x*cos"). */
+function splitLetters(run: string): string | null {
+  if (NAMES.includes(run)) return run
+  const parts: string[] = []
+  let rest = run
+  while (rest) {
+    const name = NAMES.find((n) => rest.startsWith(n))
+    if (!name) return null
+    parts.push(name)
+    rest = rest.slice(name.length)
+  }
+  return parts.join('*')
 }
 
 /** Parse untrusted text into an allowlisted expression tree, or null. */

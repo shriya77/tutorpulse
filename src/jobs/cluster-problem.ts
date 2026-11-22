@@ -28,6 +28,8 @@ import { clusterOutputSchema, fallbackClusters, validateClusters, type ValidClus
 import { MAX_CLUSTER_RUNS_PER_SESSION } from '../lib/limits'
 
 export const CLUSTER_MODEL = 'claude-haiku-5-5'
+/** Models the evaluation may compare; anything else falls back to CLUSTER_MODEL. */
+const EVAL_MODELS = ['claude-haiku-5-5', 'claude-sonnet-5-5']
 
 type Records = ReturnType<typeof buildCronContext>['records']
 
@@ -89,10 +91,12 @@ export async function runClusterJob(payload: ClusterJobPayload, ctx: JobContext,
         })
 
         const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [{ role: 'user', content: prompt }]
-        for (let attempt = 0; attempt < 2 && source === 'none'; attempt++) {
+        // Up to 2 attempts; a 3rd only when the sole problem left is label length
+        // (the grouping is fine and a rewrite is cheap — see docs/AGENT_LOG.md).
+        for (let attempt = 0; source === 'none' && (attempt < 2 || (attempt === 2 && reason?.startsWith('label:'))); attempt++) {
           try {
             const r = await generateText({
-              model: ai(CLUSTER_MODEL),
+              model: ai(payload.model && EVAL_MODELS.includes(payload.model) ? payload.model : CLUSTER_MODEL),
               instructions: CLUSTER_INSTRUCTIONS,
               messages,
               output: Output.object({ schema: clusterOutputSchema }),
@@ -103,9 +107,11 @@ export async function runClusterJob(payload: ClusterJobPayload, ctx: JobContext,
             if (v.ok) {
               clusters = v.clusters
               source = attempt === 0 ? 'ai' : 'ai_retry'
+              reason = undefined
             } else {
               reason = v.reason
-              messages.push({ role: 'assistant', content: JSON.stringify(r.output) }, { role: 'user', content: buildRetryNote(v.reason) })
+              const labels = (r.output?.clusters ?? []).map((c) => c.label)
+              messages.push({ role: 'assistant', content: JSON.stringify(r.output) }, { role: 'user', content: buildRetryNote(v.reason, labels) })
             }
           } catch (e) {
             reason = `ai_error: ${e instanceof Error ? e.message.slice(0, 200) : 'unknown'}`

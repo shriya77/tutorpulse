@@ -56,6 +56,16 @@ describe('checkAnswer (T6)', () => {
     expect(checkAnswer('arctan(x)', 'atan(x)').verdict).toBe('correct')
   })
 
+  it('reads letters typed together and LaTeX braces (seen in realistic class data)', () => {
+    expect(checkAnswer('2xe^(x^2)', '2x*e^(x^2)').verdict).toBe('correct')
+    expect(checkAnswer('2x e^{x^2}', '2x*e^(x^2)').verdict).toBe('correct')
+    expect(checkAnswer('e^{x^2}', '2x*e^(x^2)').verdict).toBe('incorrect')
+    expect(checkAnswer('xsin(x)', 'x*sin(x)').verdict).toBe('correct')
+    expect(checkAnswer('2cos(x)', '2*cos(x)').verdict).toBe('correct')
+    expect(checkAnswer('exp(x)', 'e^x').verdict).toBe('correct')
+    expect(checkAnswer('xy', 'x').verdict).toBe('needs_review') // y isn't allowed
+  })
+
   it('treats an unparsable answer key as a tutor problem, not a student one', () => {
     expect(checkAnswer('6x', 'six x')).toEqual({ verdict: 'needs_review', reason: 'key_unparsable' })
   })
