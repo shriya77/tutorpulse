@@ -23,6 +23,12 @@ const LAPTOP = { width: 1280, height: 800 }
 const PHONE = { width: 390, height: 844 }
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+/** Smoothly bring an element to the middle of the tutor's screen. */
+async function focusOn(page: Page, testId: string) {
+  await page.getByTestId(testId).first().evaluate((el) => el.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+  await pause(900)
+}
+
 type Actor = { name: string; ctx: BrowserContext; page: Page; token: string }
 
 async function caption(page: Page, text: string) {
@@ -32,7 +38,7 @@ async function caption(page: Page, text: string) {
       el = document.createElement('div')
       el.id = 'demo-caption'
       el.setAttribute('style', [
-        'position:fixed', 'left:50%', 'bottom:22px', 'transform:translateX(-50%)', 'z-index:99999',
+        'position:fixed', 'left:50%', 'top:68px', 'transform:translateX(-50%)', 'z-index:99999',
         'background:rgba(29,43,58,0.92)', 'color:#fff', 'font:600 20px/1.3 "Source Sans 3",system-ui,sans-serif',
         'padding:12px 22px', 'border-radius:999px', 'box-shadow:0 6px 24px rgba(0,0,0,.18)', 'max-width:90%', 'text-align:center',
       ].join(';'))
@@ -112,14 +118,18 @@ test('record the TutorPulse demo', async ({ browser, baseURL }) => {
   await maya.page.getByTestId('join-code-input').pressSequentially(joinCode, { delay: 140 })
   await maya.page.getByTestId('join-submit').click()
   for (const s of others) {
-    await pause(1400)
+    await pause(1600)
     await act(s, 'joinSession', { joinCode })
+    await s.page.goto(`/sessions/${sessionId}`) // like a real student: on the session screen, so the roster shows them online
   }
   await expect(tutor.page.getByTestId('joined-count')).toHaveText('5 students joined', { timeout: 20_000 })
-  await pause(2500)
+  await focusOn(tutor.page, 'roster')
+  await caption(tutor.page, 'The roster fills in live as students arrive.')
+  await expect(tutor.page.getByTestId('roster')).toContainText('5 online', { timeout: 20_000 })
+  await pause(4000)
 
   // ── Scene 2: answers arrive, checked instantly (≈0:15) ──────────────────
-  await tutor.page.getByTestId('board-problem').first().scrollIntoViewIfNeeded()
+  await focusOn(tutor.page, 'board-problem')
   await caption(tutor.page, 'Answers arrive. Each one is checked exactly by maths, not by AI.')
   const answers: Array<[string, string, string]> = [
     ['Jordan', 'cos(3x²)', 'sin goes to cos'],
@@ -140,20 +150,21 @@ test('record the TutorPulse demo', async ({ browser, baseURL }) => {
   await caption(tutor.page, 'The wrong answers are grouped by why they are wrong, live.')
   const topCount = tutor.page.getByTestId('cluster-count').first()
   await expect(topCount).toHaveText('3', { timeout: 90_000 })
-  await tutor.page.getByTestId('cluster-list').first().scrollIntoViewIfNeeded()
-  await pause(6000)
+  await focusOn(tutor.page, 'cluster')
+  await pause(8000)
   const topLabel = (await tutor.page.getByTestId('cluster-label').first().textContent())!.trim()
   await caption(tutor.page, `“${topLabel}”: 3 of 5 students. One explanation can fix most of the room.`)
   await pause(3000)
   await tutor.page.getByTestId('cluster-toggle').first().click()
+  await focusOn(tutor.page, 'cluster')
   await caption(tutor.page, 'The tutor can see the answers behind it, without names.')
-  await pause(7000)
+  await pause(8000)
 
   // ── Scene 4: take it to the board (≈1:00) ───────────────────────────────
   await caption(tutor.page, 'Take it to the board: every student sees the topic on their screen.')
   await tutor.page.getByTestId('take-to-board').first().click()
   await expect(maya.page.getByTestId('focus-banner')).toContainText(topLabel, { timeout: 15_000 })
-  await pause(7000)
+  await pause(9000)
 
   // ── Scene 5: students revise, the count drops (≈1:10) ───────────────────
   await caption(tutor.page, 'After the explanation, students revise. Watch the count fall.')
@@ -168,9 +179,10 @@ test('record the TutorPulse demo', async ({ browser, baseURL }) => {
   }
   await expect(tutor.page.getByTestId('stat-correct').first()).toHaveText('3', { timeout: 20_000 })
   await expect(topCount).toHaveText('1', { timeout: 30_000 })
-  await pause(2500)
+  await focusOn(tutor.page, 'board-problem')
+  await pause(3000)
   await caption(tutor.page, 'Correct went from 1 to 3. The group shrank from 3 students to 1.')
-  await pause(6000)
+  await pause(9000)
   await caption(tutor.page, 'TutorPulse: see why, teach once, watch it land.')
   await pause(5000)
   const sceneEnd = Date.now()

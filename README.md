@@ -6,7 +6,7 @@ Students join with a 6-character code or QR code and submit an answer plus one l
 
 > students submit → AI groups the wrong answers by *why* → tutor teaches to the biggest group → students revise → everyone leaves with targeted practice
 
-- **Live:** https://tutorpulse.app.space
+- **Live:** https://tutorpulse.app.space · **Demo video (91 s):** [docs/demo/tutorpulse-demo.mp4](docs/demo/tutorpulse-demo.mp4)
 - **Spec:** [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) · **SDK findings:** [docs/SDK_NOTES.md](docs/SDK_NOTES.md) · **Build log:** [docs/AGENT_LOG.md](docs/AGENT_LOG.md)
 
 ---
