@@ -17,7 +17,6 @@
  * restrictions require separate controls.
  */
 
-import { APP_NAME } from './constants'
 
 /** Injected by prerender.ts: `https://<name>.app.space` from wrangler.toml, or
  *  what `deepspace deploy` passes (staging: spacestest.com). Absent in unit
@@ -25,7 +24,7 @@ import { APP_NAME } from './constants'
 declare const __DEEPSPACE_SITE_ORIGIN__: string | undefined
 
 export const seo = {
-  title: `${APP_NAME} — see why answers are wrong, live`,
+  title: 'TutorPulse — see why answers are wrong, live',
   description:
     'TutorPulse is a live group-tutoring room: students submit answers, and the tutor sees wrong answers grouped by misconception while the session is still running.',
   /** Public origin for canonical URLs, og:url, and the sitemap — no trailing
