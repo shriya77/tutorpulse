@@ -11,6 +11,7 @@ import { Badge, Button } from '@/components/ui'
 import type { ClusterData, Envelope, ProblemData, SessionData, SubmissionData } from '../../actions/types'
 import { useAnswerKeys, useSessionClusters, useSessionProblems, useSessionSubmissions } from '../../hooks/useSessionData'
 import { callAction } from '../../lib/callAction'
+import { useWorkImage } from '../../hooks/useWorkImage'
 import { OTHER_LABEL } from '../../lib/clusters'
 import { MathText } from '../MathText'
 import { ProblemEditor } from './ProblemEditor'
@@ -321,6 +322,7 @@ function ClusterItem({
       <div className="mt-2 flex flex-wrap gap-2">
         <Button size="sm" variant="ghost" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((v) => !v)} data-testid="cluster-toggle">
           {open ? 'Hide answers' : `Show answers (${answers.length})`}
+          {!open && answers.some((s) => s.data.workKey) && <span className="text-muted-foreground"> with working</span>}
         </Button>
         {live && (
           <Button
@@ -340,10 +342,31 @@ function ClusterItem({
             <li key={s.recordId} className="text-sm">
               <code className="font-mono text-foreground">{s.data.answer}</code>
               {s.data.explanation && <span className="text-muted-foreground">: “{s.data.explanation}”</span>}
+              {s.data.workKey && <WorkThumb submissionId={s.recordId} revision={s.data.revision} />}
             </li>
           ))}
         </ul>
       )}
     </li>
+  )
+}
+
+/** A student's handwritten working, fetched through the tutor-checked route. Tap to enlarge. */
+function WorkThumb({ submissionId, revision }: { submissionId: string; revision: number }) {
+  const { url, failed } = useWorkImage(submissionId, true, revision)
+  const [big, setBig] = useState(false)
+  if (failed) return <p className="mt-1 text-xs text-muted-foreground">Working could not be loaded.</p>
+  if (!url) return <div className="mt-1 h-24 w-32 animate-pulse rounded-lg bg-muted" aria-label="Loading working" />
+  return (
+    <button
+      type="button"
+      onClick={() => setBig((v) => !v)}
+      aria-expanded={big}
+      aria-label={big ? 'Shrink working' : 'Enlarge working'}
+      className="mt-1 block cursor-zoom-in rounded-lg border border-border bg-white focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      data-testid="work-thumb"
+    >
+      <img src={url} alt="Student's handwritten working" className={big ? 'w-full max-w-2xl rounded-lg' : 'h-24 w-auto rounded-lg'} />
+    </button>
   )
 }

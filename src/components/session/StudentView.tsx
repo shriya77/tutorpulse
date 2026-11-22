@@ -6,15 +6,18 @@
  * enforces that, not this component (see tests/privacy.spec.ts).
  */
 
-import { useEffect, useState, type FormEvent } from 'react'
-import { useAuth, usePresenceRoom, useQuery } from 'deepspace'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useAuth, usePresenceRoom, useQuery, useR2Files } from 'deepspace'
 import { Button, Input, Label } from '@/components/ui'
 import type { Envelope, SessionData, SubmissionData } from '../../actions/types'
 import { useSessionProblems } from '../../hooks/useSessionData'
 import { callAction } from '../../lib/callAction'
+import { workRelativeKey } from '../../lib/work'
+import { useWorkImage } from '../../hooks/useWorkImage'
 import { MathText } from '../MathText'
 import { HintPanel } from './HintPanel'
 import { PracticeSetLink } from './PracticeSetLink'
+import { WorkPad, type WorkPadHandle } from './WorkPad'
 
 /** What a student shares with the tutor's live roster (F10). Ephemeral, never stored. */
 export interface StudentPresence {
@@ -109,6 +112,11 @@ function AnswerCard({
   const [explanation, setExplanation] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [padDirty, setPadDirty] = useState(false)
+  const pad = useRef<WorkPadHandle>(null)
+  const { upload } = useR2Files() // private 'self' folder: only this student (and the checked route) can read it
+  // The saved working, so a revision continues from it. Fetched once per submission row.
+  const { url: savedWorkUrl } = useWorkImage(mine?.recordId, !!mine?.data.workKey)
 
   // Prefill with the saved answer once it arrives, so revising starts from it.
   useEffect(() => {
@@ -118,16 +126,35 @@ function AnswerCard({
     }
   }, [mine?.recordId])
 
-  const unchanged = mine && mine.data.answer === answer.trim() && (mine.data.explanation ?? '') === explanation.trim()
+  const unchanged =
+    mine && !padDirty && mine.data.answer === answer.trim() && (mine.data.explanation ?? '') === explanation.trim()
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     setBusy(true)
-    const r = await callAction<{ revision: number }>('submitAnswer', { problemId, answer, explanation })
-    setBusy(false)
-    if (!r.ok) setError(r.error)
-    else onSubmitted()
+    try {
+      // Untouched pad: keep the working already saved. Otherwise upload the new drawing
+      // (same key per problem, so it replaces the old one), or none if it was cleared.
+      let workKey = mine?.data.workKey ?? ''
+      if (pad.current?.dirty) {
+        const png = await pad.current.exportPng()
+        workKey = ''
+        if (png) {
+          const up = await upload(png, 'working.png', { key: workRelativeKey(problemId) })
+          if (!up.success || !up.key) throw new Error(up.error || 'Could not save your working')
+          workKey = up.key
+        }
+      }
+      const r = await callAction<{ revision: number }>('submitAnswer', { problemId, answer, explanation, workKey })
+      if (!r.ok) throw new Error(r.error)
+      pad.current?.markSaved()
+      onSubmitted()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save your answer')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -141,6 +168,14 @@ function AnswerCard({
         aria-label={`Problem ${number}`}
       >
         <MathText source={prompt} display />
+      </div>
+
+      <div className="grid gap-1.5">
+        <span className="text-sm font-medium text-foreground">Show your working</span>
+        <p className="-mt-1 text-xs text-muted-foreground">
+          Write your steps here. Only your tutor sees them, and it helps them spot where things went off track.
+        </p>
+        <WorkPad ref={pad} baseUrl={savedWorkUrl} disabled={locked || busy} onDirtyChange={setPadDirty} />
       </div>
 
       <div className="grid gap-1.5">
