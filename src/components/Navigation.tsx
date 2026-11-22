@@ -11,7 +11,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { AuthOverlay, useAuthProfileReady, signOut } from 'deepspace'
-import { ChevronDown, LogOut, Menu, X } from 'lucide-react'
+import { ChevronDown, LogOut, Menu, X, Activity } from 'lucide-react'
 import { APP_NAME } from '../constants'
 import type { Role } from '../constants'
 import { nav } from '../nav'
@@ -69,10 +69,13 @@ export default function Navigation() {
 
   return (
     <>
-      <nav data-testid="app-navigation" className="border-b border-border bg-background">
-        <div className="mx-auto flex h-12 max-w-7xl items-center gap-4 px-4">
-          <Link to="/home" className="text-sm font-semibold text-foreground">
-            {APP_NAME}
+      <nav data-testid="app-navigation" className="border-b border-border bg-card/90 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-5xl items-center gap-4 px-4">
+          <Link to="/home" className="flex items-center gap-2 text-foreground" aria-label={`${APP_NAME} home`}>
+            <span aria-hidden className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Activity className="size-4" strokeWidth={2.5} />
+            </span>
+            <span className="font-display text-lg font-semibold tracking-tight">TutorPulse</span>
           </Link>
 
           <div className="hidden items-center md:flex">{visibleNav.map(navLink)}</div>

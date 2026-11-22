@@ -64,7 +64,7 @@ function OpenSessionBar({ session, problemCount, missingKeys }: { session: Envel
     if (!r.ok) setError(r.error)
   }
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] p-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <p className="font-medium text-foreground">Set up your problems, then open the session.</p>
         <p className="text-sm text-muted-foreground">
@@ -91,13 +91,13 @@ function LiveHeader({ session }: { session: Envelope<SessionData> }) {
     setBusy(false)
   }
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] p-5 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
         {live && session.data.joinCode && <JoinQr code={session.data.joinCode} />}
         <div className="text-center sm:text-left">
           <p className="text-sm text-muted-foreground">{live ? 'Scan or enter the join code' : 'Session ended'}</p>
           {live && (
-            <p className="font-mono text-4xl font-semibold tracking-[0.25em] text-foreground" data-testid="join-code" aria-label={`Join code ${session.data.joinCode?.split('').join(' ')}`}>
+            <p className="font-mono text-4xl font-bold tracking-[0.25em] text-primary" data-testid="join-code" aria-label={`Join code ${session.data.joinCode?.split('').join(' ')}`}>
               {session.data.joinCode}
             </p>
           )}
@@ -206,7 +206,7 @@ function ProblemBoardCard({
   const wrong = stats.submitted - stats.correct
 
   return (
-    <article className={`rounded-xl border bg-card p-5 ${isCurrent ? 'border-primary ring-1 ring-primary' : 'border-border'}`} data-testid="board-problem">
+    <article className={`rounded-2xl border bg-card p-5 shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] ${isCurrent ? 'border-primary ring-2 ring-primary/30' : 'border-border'}`} data-testid="board-problem">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-muted-foreground">Problem {index + 1}</span>
@@ -230,9 +230,9 @@ function ProblemBoardCard({
       <div className="my-3 text-xl text-foreground"><MathText source={problem.data.prompt} display /></div>
 
       <dl className="grid grid-cols-3 gap-3 text-center" data-testid="problem-stats">
-        <Stat label="Submitted" value={stats.submitted} testId="stat-submitted" />
-        <Stat label="Correct" value={stats.correct} testId="stat-correct" />
-        <Stat label="Not yet correct" value={wrong} testId="stat-wrong" />
+        <Stat label="Submitted" value={stats.submitted} testId="stat-submitted" tone="bg-secondary" />
+        <Stat label="Correct" value={stats.correct} testId="stat-correct" tone="bg-success/12" />
+        <Stat label="Not yet correct" value={wrong} testId="stat-wrong" tone="bg-highlight/30" />
       </dl>
       {stats.needsReview > 0 && (
         <p className="mt-2 text-xs text-muted-foreground">{stats.needsReview} answer{stats.needsReview === 1 ? '' : 's'} couldn’t be checked automatically (counted as not yet correct).</p>
@@ -240,7 +240,7 @@ function ProblemBoardCard({
 
       <section className="mt-4 space-y-2" aria-label={`Misconceptions for problem ${index + 1}`}>
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-medium text-foreground">Why answers are wrong</h3>
+          <h3 className="font-display text-base font-semibold text-foreground">Why answers are wrong</h3>
           {grouping && <span className="text-xs text-muted-foreground" aria-live="polite">Updating groups…</span>}
         </div>
         {clusters.length === 0 ? (
@@ -263,11 +263,11 @@ function ProblemBoardCard({
   )
 }
 
-function Stat({ label, value, testId }: { label: string; value: number; testId: string }) {
+function Stat({ label, value, testId, tone }: { label: string; value: number; testId: string; tone: string }) {
   return (
-    <div className="rounded-lg bg-muted px-2 py-2">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="font-mono text-2xl font-semibold text-foreground" data-testid={testId}>{value}</dd>
+    <div className={`rounded-xl px-2 py-3 ${tone}`}>
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd className="font-display text-3xl font-semibold text-foreground" data-testid={testId}>{value}</dd>
     </div>
   )
 }
@@ -294,10 +294,13 @@ function ClusterItem({
   const panelId = `cluster-answers-${cluster.recordId}`
 
   return (
-    <li className={`rounded-lg border px-3 py-2 ${onBoard ? 'border-info bg-info/10' : 'border-border'}`} data-testid="cluster">
+    <li
+      className={`rounded-xl border border-l-4 px-4 py-3 ${onBoard ? 'border-highlight border-l-highlight bg-accent/60' : 'border-border border-l-primary bg-card'}`}
+      data-testid="cluster"
+    >
       <div className="flex items-baseline justify-between gap-3">
         <span className="font-medium text-foreground" data-testid="cluster-label">{cluster.data.label}</span>
-        <span className="font-mono text-lg font-semibold text-foreground" data-testid="cluster-count" aria-label={`${cluster.data.count} students`}>
+        <span className="hl font-display text-2xl font-semibold text-foreground" data-testid="cluster-count" aria-label={`${cluster.data.count} students`}>
           {cluster.data.count}
         </span>
       </div>

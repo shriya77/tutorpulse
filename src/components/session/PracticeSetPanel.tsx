@@ -27,7 +27,7 @@ export function PracticeSetPanel({ session }: { session: Envelope<SessionData> }
   }
 
   return (
-    <section aria-label="Practice set" className="space-y-3 rounded-xl border border-border bg-card p-5" data-testid="practice-panel">
+    <section aria-label="Practice set" className="space-y-3 rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] p-5" data-testid="practice-panel">
       <div className="flex items-center gap-2">
         <h2 className="font-medium text-foreground">Practice set</h2>
         {latest && (

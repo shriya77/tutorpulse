@@ -44,3 +44,47 @@
   --color-shell: #fafafa;
   --color-shell-panel: #ffffff;
 }
+
+/*
+ * Notebook — TutorPulse's theme.
+ * Direction: a tutor's squared notebook on a sunlit study table. Warm paper
+ * background, ink-blue text and actions, and a highlighter-yellow mark used
+ * sparingly for the thing that matters most (misconception counts, the
+ * focus banner). Soft, friendly radius; quiet shadows.
+ */
+[data-theme="notebook"] {
+  color-scheme: light;
+  --color-background: #fbf8f2;
+  --color-foreground: #1d2b3a;
+  --color-card: #ffffff;
+  --color-card-foreground: #1d2b3a;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #1d2b3a;
+  --color-primary: #2b4c9b;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #eef2fa;
+  --color-secondary-foreground: #1d2b3a;
+  --color-muted: #f3efe6;
+  --color-muted-foreground: #5b6676;
+  --color-accent: #fff3b0;
+  --color-accent-foreground: #1d2b3a;
+  --color-destructive: #c53030;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e7dfcf;
+  --color-input: #ddd4c2;
+  --color-ring: #2b4c9b;
+  --color-highlight: #ffe45c;
+  --color-grid: #f0eadd;
+  /* Status colours tuned for contrast on paper (WCAG AA for text on them). */
+  --color-success: #157a45;
+  --color-success-foreground: #ffffff;
+  --color-warning: #f5b324;
+  --color-warning-foreground: #1d2b3a;
+  --color-info: #2b4c9b;
+  --color-info-foreground: #ffffff;
+  --radius: 0.75rem;
+  --shadow-card: 0 1px 2px 0 rgba(29, 43, 58, 0.05);
+  --shadow-card-hover: 0 4px 14px 0 rgba(29, 43, 58, 0.08);
+  --color-shell: #f6f1e7;
+  --color-shell-panel: #ffffff;
+}

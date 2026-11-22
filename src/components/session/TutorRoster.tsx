@@ -38,13 +38,13 @@ export function TutorRoster({ session, problems }: { session: Envelope<SessionDa
   const stuckCount = rows.filter((r) => r.stuck).length
 
   return (
-    <section aria-label="Students" className="rounded-xl border border-border bg-card p-4" data-testid="roster">
+    <section aria-label="Students" className="rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] p-4" data-testid="roster">
       <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="font-medium text-foreground">
+        <h2 className="font-display text-lg font-semibold text-foreground">
           Students <span className="text-muted-foreground">({rows.filter((r) => r.online).length} online)</span>
         </h2>
         {stuckCount > 0 && (
-          <span className="text-sm font-medium text-warning-foreground" aria-live="polite">{stuckCount} stuck</span>
+          <span className="rounded-full bg-warning px-2.5 py-0.5 text-sm font-semibold text-warning-foreground" aria-live="polite">{stuckCount} stuck</span>
         )}
         {!connected && <span className="text-xs text-muted-foreground">Reconnecting…</span>}
       </div>

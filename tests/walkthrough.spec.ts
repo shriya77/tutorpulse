@@ -66,6 +66,7 @@ test('walkthrough: wrong → cluster, revise → cluster gone, lock, next proble
   await expect(board1.getByTestId('cluster')).toHaveCount(1, { timeout: 60_000 })
   console.log('[walkthrough] cluster:', await board1.getByTestId('cluster-label').textContent())
   await shot(tutor, '3-cluster')
+  await board1.screenshot({ path: 'test-results/walkthrough-3-board-card.png' })
 
   // 4. A right answer → 2 / 1.
   await submit(a, '6x cos(3x²)', 'outer derivative times inner derivative')

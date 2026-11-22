@@ -46,7 +46,7 @@ export function StudentView({ session }: { session: Envelope<SessionData> }) {
 
   if (session.data.status === 'closed') {
     return (
-      <div className="rounded-xl border border-border bg-card p-6 text-center">
+      <div className="rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] p-6 text-center">
         <p className="text-lg font-medium text-foreground">This session has ended.</p>
         <p className="mt-1 text-sm text-muted-foreground">Thanks for taking part.</p>
         <PracticeSetLink sessionId={session.recordId} />
@@ -57,9 +57,9 @@ export function StudentView({ session }: { session: Envelope<SessionData> }) {
   return (
     <div className="space-y-5">
       {session.data.focusLabel && (
-        <div role="status" className="rounded-xl border border-info bg-info/15 px-4 py-3 text-foreground" data-testid="focus-banner">
-          <span className="text-sm font-medium">Discussing: </span>
-          {session.data.focusLabel}
+        <div role="status" className="rounded-2xl border-2 border-highlight bg-accent px-5 py-4 text-foreground" data-testid="focus-banner">
+          <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Discussing </span>
+          <span className="hl font-display text-xl font-semibold">{session.data.focusLabel}</span>
         </div>
       )}
       {status === 'loading' ? (
@@ -131,7 +131,7 @@ function AnswerCard({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-border bg-card p-5" aria-labelledby="problem-heading">
+    <form onSubmit={onSubmit} className="space-y-4 rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] p-5" aria-labelledby="problem-heading">
       <h2 id="problem-heading" className="text-sm font-medium text-muted-foreground">Problem {number}</h2>
       {/* Long expressions scroll sideways on phones; the edge fade hints that there is more. */}
       <div
@@ -178,7 +178,7 @@ function AnswerCard({
         <Button type="submit" disabled={locked || busy || !answer.trim() || !!unchanged} data-testid="submit-answer">
           {busy ? 'Saving…' : mine ? 'Update answer' : 'Submit'}
         </Button>
-        <span aria-live="polite" className="text-sm text-muted-foreground" data-testid="submit-status">
+        <span aria-live="polite" className={`text-sm font-medium ${mine && !locked ? 'text-success' : 'text-muted-foreground'}`} data-testid="submit-status">
           {locked
             ? 'Answers are locked for this problem.'
             : mine

@@ -47,6 +47,7 @@ test('main screens fit a phone', async ({ users }) => {
 
   // Student on a phone: home, join via the QR link, answer, hint panel.
   await student.page.goto('/home')
+  await expect(student.page.getByTestId('join-code-input')).toBeVisible({ timeout: 15_000 })
   await fits(student.page, '1-home')
   await student.page.goto(`/join?code=${code}`)
   await expect(student.page.getByTestId('student-problem')).toBeVisible({ timeout: 20_000 })

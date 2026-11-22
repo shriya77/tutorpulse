@@ -17,9 +17,10 @@ A tutor working with 5–20 students can see *who* got a problem wrong, but not 
 - **AI chat + custom tools:** a read-only Socratic hint assistant (`ChatPanel`, `get_current_problem`, `search_notes`), scoped server-side to the student's live session.
 - **Anthropic sandbox:** a background job has Claude write the practice-set PDF and correct-rate chart in Python.
 - **Managed knowledge:** the tutor's notes (PDF or text) are indexed per session and ground the hints.
+- **Local agent tools (F17 stretch):** `npx deepspace agent invoke tutorpulse sessionReport` gives a tutor's own coding agent a per-session report. It's tutor-only and contains counts and labels only.
 - **Platform primitives:** auth; collections with row-level permissions (`collaborator`, `ownerField`, `collaboratorsField`, `uniqueOn`, `writableFields`); real-time sync; server actions; presence (live roster, "I'm stuck"); background jobs; app file storage; the multi-user Playwright fixture; one-command deploy.
 
-**Left out on purpose:** LiveKit video (tutoring is in the room or on Zoom already, and video adds cost without helping the core moment), payments (peer tutoring is free), and Yjs collaborative text (answers are individual by design, and a shared editor would break clustering). Messaging, Google OAuth, cron and mobile publishing were skipped for similar reasons. The stretch local-agent report (F17) was not built.
+**Left out on purpose:** LiveKit video (tutoring is in the room or on Zoom already, and video adds cost without helping the core moment), payments (peer tutoring is free), and Yjs collaborative text (answers are individual by design, and a shared editor would break clustering). Messaging, Google OAuth, cron and mobile publishing were skipped for similar reasons.
 
 ## 3. Main tradeoff
 
@@ -47,4 +48,4 @@ A tutor working with 5–20 students can see *who* got a problem wrong, but not 
 - [ ] Secret scan reviewed (agent's commands and results are in `docs/AGENT_LOG.md`) — *notes:*
 - [ ] Bugs I caught or decisions I changed — *list:*
 
-**Unfinished / next:** session history and per-student trends; answers in other variables, handwriting or photos; a weekly misconception digest (scheduled jobs); F17 local-agent session report; private problem banks via per-session rooms; LMS export.
+**Unfinished / next:** session history and per-student trends; answers in other variables, handwriting or photos; a weekly misconception digest (scheduled jobs); private problem banks via per-session rooms; LMS export.

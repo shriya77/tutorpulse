@@ -39,6 +39,12 @@
   --color-ring: #818cf8;
   --radius: 0.5rem;
 
+  /* TutorPulse type pair: Fraunces (display, warmth) + Source Sans 3 (body, clarity). */
+  --font-sans: 'Source Sans 3', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --color-highlight: #ffe45c;
+  --color-grid: #1e1e1e;
+
   /*
    * Map the rounded-* utilities onto --radius so a theme (or you) can change
    * the app's shape language in one place. At the default 0.5rem these equal
@@ -231,4 +237,29 @@
   a, button, [role="button"], input, select, textarea {
     touch-action: manipulation;
   }
+}
+
+/* ── TutorPulse signature elements ─────────────────────────────────────── */
+
+/* Highlighter swipe behind a word or number (misconception counts, banner). */
+@utility hl {
+  background-image: linear-gradient(transparent 52%, var(--color-highlight) 52%, var(--color-highlight) 90%, transparent 90%);
+  padding-inline: 0.15em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* Faint squared-notebook grid for the app canvas. */
+@utility paper-grid {
+  background-color: var(--color-background);
+  background-image:
+    linear-gradient(var(--color-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: -1px -1px;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
 }

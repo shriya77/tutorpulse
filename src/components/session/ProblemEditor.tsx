@@ -81,7 +81,7 @@ function ProblemFields({
       <div className="grid gap-1.5">
         <Label htmlFor={`${idPrefix}-answer`}>Correct answer (expression in x; only you can see this)</Label>
         <Input id={`${idPrefix}-answer`} value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="6x*cos(3x^2)" className="font-mono" />
-        {warning && <p className="text-xs text-warning-foreground bg-warning/20 rounded px-2 py-1">{warning}</p>}
+        {warning && <p className="rounded-md border border-warning/50 bg-warning/15 px-2 py-1 text-xs text-foreground">{warning}</p>}
       </div>
       <div className="grid gap-1.5">
         <Label htmlFor={`${idPrefix}-mistakes`}>Mistakes you expect (optional, helps the AI name groups)</Label>
@@ -139,7 +139,7 @@ function ProblemRow({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4" data-testid="problem-row">
+    <div className="rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] p-4" data-testid="problem-row">
       <div className="mb-3 flex items-start justify-between gap-3">
         <span className="text-sm font-medium text-muted-foreground">Problem {index + 1}</span>
         <div className="flex gap-1">

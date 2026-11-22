@@ -22,8 +22,8 @@ export default function Landing() {
       <main data-testid="static-landing" className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center gap-10 px-6 py-16">
         <header className="space-y-4">
           <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">TutorPulse</p>
-          <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-            See <em>why</em> your group gets it wrong — while the session is still running.
+          <h1 className="font-display text-4xl font-semibold tracking-tight text-foreground sm:text-6xl">
+            See <span className="hl">why</span> your group gets it wrong.
           </h1>
           <p className="max-w-xl text-lg text-muted-foreground">
             A live room for group tutoring. Seven students write cos(3x²) for d/dx sin(3x²)? Your board says
@@ -41,9 +41,9 @@ export default function Landing() {
         </header>
         <ol className="grid gap-4 sm:grid-cols-2">
           {STEPS.map((s, i) => (
-            <li key={s.title} className="rounded-xl border border-border bg-card p-5">
+            <li key={s.title} className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_2px_0_rgba(29,43,58,0.05)]">
               <p className="text-sm text-muted-foreground">Step {i + 1}</p>
-              <h2 className="mt-1 font-semibold text-foreground">{s.title}</h2>
+              <h2 className="mt-1 font-display text-lg font-semibold text-foreground">{s.title}</h2>
               <p className="mt-1 text-sm text-muted-foreground">{s.body}</p>
             </li>
           ))}

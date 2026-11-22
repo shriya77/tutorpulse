@@ -17,10 +17,10 @@ const PROMPTS = ['How do I start this problem?', 'Which rule applies here?', 'Ca
 export function HintPanel({ userId }: { userId: string }) {
   const [open, setOpen] = useState(false)
   return (
-    <section aria-label="Hint assistant" className="rounded-xl border border-border bg-card">
+    <section aria-label="Hint assistant" className="rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(29,43,58,0.05)]">
       <div className="flex items-center justify-between gap-3 p-4">
         <div>
-          <h2 className="font-medium text-foreground">Need a nudge?</h2>
+          <h2 className="font-display text-lg font-semibold text-foreground">Need a nudge?</h2>
           <p className="text-sm text-muted-foreground">The hint assistant guides you with questions. It won’t give you the answer.</p>
         </div>
         <Button variant="outline" aria-expanded={open} onClick={() => setOpen((v) => !v)} data-testid="hint-toggle">

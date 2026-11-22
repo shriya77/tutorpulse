@@ -62,7 +62,7 @@ export function NotesPanel({ sessionId }: { sessionId: string }) {
   }
 
   return (
-    <section aria-label="Notes for the hint assistant" className="space-y-3 rounded-xl border border-border bg-card p-4" data-testid="notes-panel">
+    <section aria-label="Notes for the hint assistant" className="space-y-3 rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] p-4" data-testid="notes-panel">
       <div>
         <h2 className="font-medium text-foreground">Notes for the hint assistant</h2>
         <p className="text-sm text-muted-foreground">

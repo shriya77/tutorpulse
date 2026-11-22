@@ -5,6 +5,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AuthOverlay, useAuth, useMutations, useQuery } from 'deepspace'
+import { DoorOpen, PenLine } from 'lucide-react'
 import { Badge, Button, Input, Label } from '@/components/ui'
 import type { SessionData } from '../../actions/types'
 import { callAction } from '../../lib/callAction'
@@ -40,10 +41,12 @@ export default function HomePage() {
 
 function Hero() {
   return (
-    <header className="space-y-2">
-      <h1 className="text-3xl font-semibold tracking-tight text-foreground">TutorPulse</h1>
-      <p className="text-muted-foreground">
-        Live group tutoring that shows you <em>why</em> answers are wrong, while the session is still running.
+    <header className="space-y-3">
+      <h1 className="font-display text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
+        See <span className="hl">why</span> they got it wrong.
+      </h1>
+      <p className="max-w-xl text-lg text-muted-foreground">
+        Live group tutoring: answers checked instantly, wrong ones grouped by misconception while the session is still running.
       </p>
     </header>
   )
@@ -70,8 +73,11 @@ function JoinCard() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3 rounded-xl border border-border bg-card p-5" aria-labelledby="join-title">
-      <h2 id="join-title" className="font-medium text-foreground">Join a session</h2>
+    <form onSubmit={onSubmit} className="space-y-3 rounded-2xl border border-border bg-card p-6 shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] border-t-4 border-t-primary" aria-labelledby="join-title">
+      <h2 id="join-title" className="flex items-center gap-2 font-display text-xl font-semibold text-foreground">
+        <DoorOpen aria-hidden className="size-5 text-primary" /> Join a session
+      </h2>
+      <p className="text-sm text-muted-foreground">Student? Enter the code on your tutor’s screen.</p>
       <Label htmlFor="join-code" className="sr-only">Join code</Label>
       <Input
         id="join-code"
@@ -82,10 +88,10 @@ function JoinCard() {
         autoCapitalize="characters"
         autoComplete="off"
         maxLength={8}
-        className="font-mono text-lg tracking-[0.3em]"
+        className="h-12 text-center font-mono text-xl tracking-[0.35em] placeholder:tracking-normal placeholder:font-sans placeholder:text-base"
       />
       {error && <p role="alert" className="text-sm text-destructive" data-testid="join-error">{error}</p>}
-      <Button type="submit" className="w-full" disabled={busy} data-testid="join-submit">
+      <Button type="submit" size="lg" className="w-full" disabled={busy} data-testid="join-submit">
         {busy ? 'Joining…' : 'Join'}
       </Button>
     </form>
@@ -111,8 +117,11 @@ function NewSessionCard() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3 rounded-xl border border-border bg-card p-5" aria-labelledby="new-title">
-      <h2 id="new-title" className="font-medium text-foreground">Run a session</h2>
+    <form onSubmit={onSubmit} className="space-y-3 rounded-2xl border border-border bg-card p-6 shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] border-t-4 border-t-highlight" aria-labelledby="new-title">
+      <h2 id="new-title" className="flex items-center gap-2 font-display text-xl font-semibold text-foreground">
+        <PenLine aria-hidden className="size-5 text-primary" /> Run a session
+      </h2>
+      <p className="text-sm text-muted-foreground">Tutor? Start a session and add your problems.</p>
       <Label htmlFor="session-title" className="sr-only">Session title</Label>
       <Input
         id="session-title"
@@ -123,7 +132,7 @@ function NewSessionCard() {
         maxLength={120}
       />
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      <Button type="submit" variant="secondary" className="w-full" disabled={!ready} data-testid="new-session-submit">
+      <Button type="submit" variant="outline" className="w-full" disabled={!ready} data-testid="new-session-submit">
         New session
       </Button>
     </form>
@@ -148,16 +157,16 @@ function SessionLists() {
         { title: 'Sessions you joined', rows: joined, empty: 'None yet. Enter a code above.' },
       ].map((list) => (
         <section key={list.title} aria-label={list.title} className="space-y-3">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">{list.title}</h2>
+          <h2 className="font-display text-lg font-semibold text-foreground">{list.title}</h2>
           {list.rows.length === 0 ? (
             <p className="text-sm text-muted-foreground">{list.empty}</p>
           ) : (
-            <ul className="divide-y divide-border rounded-xl border border-border bg-card">
+            <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] p-0">
               {list.rows.map((s) => (
                 <li key={s.recordId}>
                   <Link
                     to={`/sessions/${s.recordId}`}
-                    className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-accent"
+                    className="flex items-center justify-between gap-3 px-5 py-3.5 transition-colors hover:bg-secondary"
                   >
                     <span className="truncate text-foreground">{s.data.title}</span>
                     <Badge variant={s.data.status === 'open' ? 'success' : 'outline'}>{STATUS_LABEL[s.data.status]}</Badge>

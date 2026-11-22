@@ -92,6 +92,7 @@ flowchart LR
 | **AI chat + custom tools** (`ChatPanel`, `registerAgent`) | Read-only Socratic hint assistant with `get_current_problem` / `search_notes` | `src/ai` |
 | **Anthropic sandbox** (`codeExecutionTool`, `sandboxFiles`) | Python writes the practice-set PDF and correct-rate chart | `src/jobs/practice-set.ts` |
 | **Managed knowledge** (`knowledge(env).scoped`) | Hints grounded in the tutor's own notes, one folder per session | `src/actions/notes-actions.ts`, `src/ai/tools.ts` |
+| **Local agent tools** (`registerAgent`) | `npx deepspace agent invoke tutorpulse sessionReport` gives the tutor's own coding agent a session report (tutor-only, counts and labels only) | `src/ai/tools.ts`, `src/lib/sessionReport.ts` |
 | Multi-user testing (`users` fixture) | Tutor + 2 students in one Playwright test | `tests/` |
 | Deploy | One command to `tutorpulse.app.space` | `npx deepspace deploy` |
 
@@ -106,7 +107,6 @@ flowchart LR
 | Google OAuth / Calendar | Built-in sign-in is enough for a live tool. |
 | Scheduled jobs | Nothing recurs yet (a weekly misconception digest is a natural next step). |
 | Mobile app publishing | The student view is responsive web opened from a QR code. |
-| Local agent `sessionReport` tool (F17) | A stretch goal, not built. |
 
 ---
 
@@ -158,6 +158,12 @@ No API keys live in this repo. AI, the sandbox and knowledge all go through the 
 
 ---
 
+**Session report for your coding agent (F17):**
+
+```bash
+npx deepspace agent invoke tutorpulse sessionReport          # your most recent session
+```
+
 ## Demo (2–3 browsers)
 
 1. **Tutor:** sign in at `/home` and open **Calc I — Chain Rule Review** (created by `scripts/seed-demo.ts`), or create a session and add problems (prompt in LaTeX, answer as an expression in x). Optionally upload notes. Click **Open session**.
@@ -173,4 +179,4 @@ No API keys live in this repo. AI, the sandbox and knowledge all go through the 
 - Joining is a read-modify-write on a JSON list, retried until the student is present. A burst of simultaneous joins is very unlikely to lose one, but it isn't impossible.
 - If tutor notes contain worked solutions, the hint assistant could quote them (the upload panel warns).
 - `problems` are readable by every signed-in user (prompts aren't secret); private problem banks would need a per-session room.
-- Next: session history and per-student trends, handwriting/photo answers, a weekly misconception digest, F17 local-agent session report, LMS export.
+- Next: session history and per-student trends, handwriting/photo answers, a weekly misconception digest, LMS export.
