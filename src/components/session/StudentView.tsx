@@ -133,7 +133,15 @@ function AnswerCard({
   return (
     <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-border bg-card p-5" aria-labelledby="problem-heading">
       <h2 id="problem-heading" className="text-sm font-medium text-muted-foreground">Problem {number}</h2>
-      <div className="overflow-x-auto text-2xl text-foreground" data-testid="student-problem"><MathText source={prompt} display /></div>
+      {/* Long expressions scroll sideways on phones; the edge fade hints that there is more. */}
+      <div
+        className="overflow-x-auto text-lg text-foreground sm:text-2xl [mask-image:linear-gradient(to_right,black_92%,transparent)] sm:[mask-image:none]"
+        data-testid="student-problem"
+        tabIndex={0}
+        aria-label={`Problem ${number}`}
+      >
+        <MathText source={prompt} display />
+      </div>
 
       <div className="grid gap-1.5">
         <Label htmlFor="answer">Your final answer</Label>

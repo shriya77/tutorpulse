@@ -17,6 +17,15 @@ export default function SessionPage() {
   const { session, status } = useSessionRecord(id)
 
   if (status === 'loading') return <p className="p-6 text-muted-foreground">Loading session…</p>
+  if (status === 'error') {
+    return (
+      <div role="alert" className="mx-auto max-w-md p-10 text-center">
+        <p className="text-lg font-medium text-foreground">Can’t reach the session right now</p>
+        <p className="mt-1 text-sm text-muted-foreground">Check your connection. This page reconnects by itself.</p>
+        <button type="button" onClick={() => window.location.reload()} className="mt-4 text-sm underline">Reload</button>
+      </div>
+    )
+  }
   if (!session) {
     return (
       <div className="mx-auto max-w-md p-10 text-center">
