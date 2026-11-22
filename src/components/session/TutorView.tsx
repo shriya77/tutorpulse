@@ -14,6 +14,7 @@ import { callAction } from '../../lib/callAction'
 import { OTHER_LABEL } from '../../lib/clusters'
 import { MathText } from '../MathText'
 import { ProblemEditor } from './ProblemEditor'
+import { JoinQr } from './JoinQr'
 import { NotesPanel } from './NotesPanel'
 import { PracticeSetPanel } from './PracticeSetPanel'
 import { TutorRoster } from './TutorRoster'
@@ -91,16 +92,19 @@ function LiveHeader({ session }: { session: Envelope<SessionData> }) {
   }
   return (
     <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <p className="text-sm text-muted-foreground">{live ? 'Join code' : 'Session ended'}</p>
-        {live && (
-          <p className="font-mono text-4xl font-semibold tracking-[0.25em] text-foreground" data-testid="join-code" aria-label={`Join code ${session.data.joinCode?.split('').join(' ')}`}>
-            {session.data.joinCode}
+      <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
+        {live && session.data.joinCode && <JoinQr code={session.data.joinCode} />}
+        <div className="text-center sm:text-left">
+          <p className="text-sm text-muted-foreground">{live ? 'Scan or enter the join code' : 'Session ended'}</p>
+          {live && (
+            <p className="font-mono text-4xl font-semibold tracking-[0.25em] text-foreground" data-testid="join-code" aria-label={`Join code ${session.data.joinCode?.split('').join(' ')}`}>
+              {session.data.joinCode}
+            </p>
+          )}
+          <p className="mt-1 text-sm text-muted-foreground" data-testid="joined-count">
+            {joined} student{joined === 1 ? '' : 's'} joined
           </p>
-        )}
-        <p className="mt-1 text-sm text-muted-foreground" data-testid="joined-count">
-          {joined} student{joined === 1 ? '' : 's'} joined
-        </p>
+        </div>
       </div>
       {live && (
         <div className="flex flex-col items-stretch gap-2 sm:items-end">
