@@ -7,7 +7,7 @@
 
 import type { ActionHandler } from 'deepspace/worker'
 import type { Env } from '../../worker'
-import { closeSession, joinSession, openSession } from './session-actions'
+import { closeSession, joinSession, openSession, reopenSession } from './session-actions'
 import { generatePracticeSet, publishPracticeSet } from './practice-set-actions'
 import { addSessionNotes, refreshSessionNotes } from './notes-actions'
 import { submitAnswer } from './submit-answer'
@@ -21,6 +21,7 @@ import { duplicateSession } from './duplicate-session'
 export const actions: Record<string, ActionHandler<Env>> = {
   openSession,
   closeSession,
+  reopenSession,
   joinSession,
   submitAnswer,
   generatePracticeSet,

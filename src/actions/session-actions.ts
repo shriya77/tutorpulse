@@ -1,14 +1,28 @@
 /**
- * Session lifecycle actions: open (F2), join (F4), close.
+ * Session lifecycle actions: open (F2), join (F4), close, reopen.
  * Every action starts with a guard from ./guards and scopes all reads to the
  * session it returned.
  */
 
-import type { ActionHandler } from 'deepspace/worker'
+import type { ActionHandler, ActionTools } from 'deepspace/worker'
 import type { Env } from '../../worker'
 import { generateJoinCode, normalizeJoinCode } from '../lib/joinCode'
 import { requireTutor } from './guards'
 import type { Envelope, ProblemData, SessionData } from './types'
+
+/** A join code no open session is using: `keep` if it's still free, else a new one. */
+async function freeJoinCode(tools: ActionTools, keep?: string): Promise<string | null> {
+  const free = async (code: string) => {
+    const clash = await tools.query('sessions', { where: { joinCode: code, status: 'open' }, limit: 1 })
+    return clash.success && clash.data.count === 0
+  }
+  if (keep && (await free(keep))) return keep
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const candidate = generateJoinCode()
+    if (await free(candidate)) return candidate
+  }
+  return null
+}
 
 /** Tutor opens a draft session: assigns a unique join code and points students at problem 1. */
 export const openSession: ActionHandler<Env> = async (ctx) => {
@@ -27,12 +41,7 @@ export const openSession: ActionHandler<Env> = async (ctx) => {
     .sort((a, b) => a.data.order - b.data.order)
   if (own.length === 0) return { success: false, error: 'Add at least one problem before opening the session' }
 
-  let joinCode: string | null = null
-  for (let attempt = 0; attempt < 5 && !joinCode; attempt++) {
-    const candidate = generateJoinCode()
-    const clash = await ctx.tools.query('sessions', { where: { joinCode: candidate, status: 'open' }, limit: 1 })
-    if (clash.success && clash.data.count === 0) joinCode = candidate
-  }
+  const joinCode = await freeJoinCode(ctx.tools)
   if (!joinCode) return { success: false, error: 'Could not allocate a join code, try again' }
 
   const res = await ctx.tools.update('sessions', session.recordId, {
@@ -55,6 +64,22 @@ export const closeSession: ActionHandler<Env> = async (ctx) => {
   const res = await ctx.tools.update('sessions', g.session.recordId, { status: 'closed', focusLabel: '' })
   if (!res.success) return { success: false, error: 'Could not close the session' }
   return { success: true, data: { sessionId: g.session.recordId } }
+}
+
+/**
+ * Tutor reopens an ended session: students who were in it carry on, and new
+ * ones can join. It keeps its join code unless another open session took it
+ * meanwhile. Recaps already emailed stay sent (each student gets one per
+ * session), and a shared practice set stays shared.
+ */
+export const reopenSession: ActionHandler<Env> = async (ctx) => {
+  const g = await requireTutor(ctx, ctx.params.sessionId, { statuses: ['closed'] })
+  if (!g.ok) return { success: false, error: g.error }
+  const joinCode = await freeJoinCode(ctx.tools, g.session.data.joinCode)
+  if (!joinCode) return { success: false, error: 'Could not allocate a join code, try again' }
+  const res = await ctx.tools.update('sessions', g.session.recordId, { status: 'open', joinCode })
+  if (!res.success) return { success: false, error: 'Could not reopen the session' }
+  return { success: true, data: { joinCode } }
 }
 
 const NO_SESSION = 'No open session with that code'
