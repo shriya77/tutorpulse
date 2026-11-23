@@ -156,7 +156,7 @@ function SessionLists() {
         { title: 'Sessions you run', rows: teaching, empty: 'None yet. Create one above.' },
         { title: 'Sessions you joined', rows: joined, empty: 'None yet. Enter a code above.' },
       ].map((list) => (
-        <section key={list.title} aria-label={list.title} className="space-y-3">
+        <section key={list.title} aria-label={list.title} className="min-w-0 space-y-3">
           <h2 className="font-display text-lg font-semibold text-foreground">{list.title}</h2>
           {list.rows.length === 0 ? (
             <p className="text-sm text-muted-foreground">{list.empty}</p>
@@ -168,7 +168,7 @@ function SessionLists() {
                     to={`/sessions/${s.recordId}`}
                     className="flex items-center justify-between gap-3 px-5 py-3.5 transition-colors hover:bg-secondary"
                   >
-                    <span className="truncate text-foreground">{s.data.title}</span>
+                    <span className="min-w-0 truncate text-foreground">{s.data.title}</span>
                     <Badge variant={s.data.status === 'open' ? 'success' : 'outline'}>{STATUS_LABEL[s.data.status]}</Badge>
                   </Link>
                 </li>
