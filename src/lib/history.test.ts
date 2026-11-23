@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildHistory } from './history'
+import { buildHistory, historyCsv } from './history'
 
 const input = {
   sessions: [
@@ -44,5 +44,31 @@ describe('buildHistory', () => {
     expect(leo.mistakes.map((m) => m.label)).toEqual(['Sign error'])
     const sam = h.students.find((s) => s.id === 'sam')!
     expect(sam).toMatchObject({ name: 'Student', answers: 0, correctRate: null, bySession: [{ sessionId: 's2', correctRate: null }] })
+  })
+})
+
+describe('history per session and CSV', () => {
+  const h = buildHistory({ ...input, sessions: input.sessions.map((s, i) => ({ ...s, topic: i ? 'math2413-w4' : '' })) })
+  const maya = h.students.find((s) => s.name === 'Maya')!
+
+  it('keeps counts, week and mistakes per session', () => {
+    expect(maya.bySession[1]).toMatchObject({ topic: 'math2413-w4', answers: 2, correct: 1, mistakes: ['Forgot the inner derivative'] })
+    expect(h.sessions[0].topic).toBe('math2413-w4')
+  })
+
+  it('writes one quoted row per student per session', () => {
+    const csv = historyCsv(h.students, () => 'Week 4')
+    const lines = csv.trim().split('\r\n')
+    expect(lines[0]).toBe('"Student","Session","Date","Week","Answers","Correct","Correct %","Mistake groups"')
+    expect(lines).toContain('"Maya","Week 5","2026-11-08","Week 4","2","1","50","Forgot the inner derivative"')
+    expect(lines.length).toBe(1 + h.students.reduce((n, s) => n + s.bySession.length, 0))
+  })
+
+  it('defuses spreadsheet formulas and quotes', () => {
+    const evil = buildHistory({ ...input, names: { maya: '=HYPERLINK("http://x")', leo: '@SUM(1)' } })
+    const csv = historyCsv(evil.students)
+    expect(csv).toContain(`"'=HYPERLINK(""http://x"")"`)
+    expect(csv).toContain(`"'@SUM(1)"`)
+    expect(csv).not.toMatch(/(^|,)"=/m)
   })
 })

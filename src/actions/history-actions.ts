@@ -15,13 +15,25 @@ import { listTutorSessions } from './guards'
 import type { ClusterData, Envelope, SubmissionData } from './types'
 
 const MAX_SESSIONS = 20
+const MAX_SCANNED = 200
 const MAX_NAMES = 120
+const DAY_MS = 24 * 60 * 60 * 1000
 
+/**
+ * Optional filters: `days` (only sessions from the last N days) and `topic`
+ * (one course week id). The newest 20 matching sessions are used. `topics`
+ * lists the weeks the caller's sessions use, for the filter menu.
+ */
 export const tutorHistory: ActionHandler<Env> = async (ctx) => {
-  const own = await listTutorSessions(ctx, MAX_SESSIONS)
+  const days = typeof ctx.params.days === 'number' && ctx.params.days > 0 ? Math.min(ctx.params.days, 3660) : null
+  const topic = typeof ctx.params.topic === 'string' ? ctx.params.topic.slice(0, 60) : ''
+  const since = days ? Date.now() - days * DAY_MS : null
+  const all = (await listTutorSessions(ctx, MAX_SCANNED)).filter((s) => s.data.status !== 'draft')
+  const topics = [...new Set(all.map((s) => s.data.topic).filter((t): t is string => !!t))]
+  const matching = all.filter((s) => (!since || Date.parse(s.createdAt) >= since) && (!topic || s.data.topic === topic))
+  const own = matching.slice(0, MAX_SESSIONS)
   const input: HistoryInput = { sessions: [], submissions: [], clusters: [], names: {} }
   for (const s of own) {
-    if (s.data.status === 'draft') continue
     input.sessions.push({
       id: s.recordId,
       title: s.data.title,
@@ -49,5 +61,5 @@ export const tutorHistory: ActionHandler<Env> = async (ctx) => {
   for (const s of input.sessions) for (const p of s.participantIds) ids.add(p)
   for (const x of input.submissions) ids.add(x.studentId)
   Object.assign(input.names, await displayNamesFor(ctx.tools, [...ids].slice(0, MAX_NAMES)))
-  return { success: true, data: buildHistory(input) }
+  return { success: true, data: { ...buildHistory(input), topics, matching: matching.length } }
 }
