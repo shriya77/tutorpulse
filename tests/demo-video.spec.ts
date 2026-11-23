@@ -212,7 +212,6 @@ test('record the TutorPulse demo', async ({ browser, baseURL }) => {
   await caption(tutor.page, 'Then type the final answer. Each one is checked exactly by maths, not by AI.')
   await maya.page.getByTestId('answer-input').scrollIntoViewIfNeeded()
   await maya.page.getByTestId('answer-input').pressSequentially('cos(3x^2)', { delay: 90 })
-  await maya.page.getByTestId('explanation-input').pressSequentially('derivative of sin is cos', { delay: 50 })
   await maya.page.getByTestId('submit-answer').click()
   for (const [who, answer, explanation] of answers) {
     await pause(2200)
@@ -254,8 +253,6 @@ test('record the TutorPulse demo', async ({ browser, baseURL }) => {
   await maya.page.getByTestId('answer-input').scrollIntoViewIfNeeded()
   await maya.page.getByTestId('answer-input').fill('')
   await maya.page.getByTestId('answer-input').pressSequentially('6x*cos(3x^2)', { delay: 90 })
-  await maya.page.getByTestId('explanation-input').fill('')
-  await maya.page.getByTestId('explanation-input').pressSequentially('forgot the inside derivative', { delay: 45 })
   await maya.page.getByTestId('submit-answer').click()
   for (const [who, answer] of [['Jordan', '6x cos(3x^2)']] as const) {
     await pause(3500)

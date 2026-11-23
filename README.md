@@ -2,7 +2,7 @@
 
 **A live room for group tutoring that shows the tutor _why_ students get a problem wrong, while the session is still running.**
 
-Students join with a 6-character code or QR code and submit an answer plus one line on how they got it. Answers are checked **deterministically** with mathjs. The wrong ones are grouped by Claude into named **misconception clusters** ("Dropped the inner derivative — 7") that update live on the tutor's board. The tutor puts a cluster on every student's screen, explains it, re-opens answers and watches the count fall. When the session ends, the app writes a **practice-set PDF** in Anthropic's sandbox that targets the group's actual mistakes. Students also get a read-only, Socratic **hint assistant** grounded in the tutor's uploaded notes.
+Students join with a 6-character code or QR code and submit an answer, with their working on a sketch pad (or, without it, an optional line on how they got it). Answers are checked **deterministically** with mathjs. The wrong ones are grouped by Claude into named **misconception clusters** ("Dropped the inner derivative — 7") that update live on the tutor's board. The tutor puts a cluster on every student's screen, explains it, re-opens answers and watches the count fall. When the session ends, the app writes a **practice-set PDF** in Anthropic's sandbox that targets the group's actual mistakes. Students also get a read-only, Socratic **hint assistant** grounded in the tutor's uploaded notes.
 
 > students submit → AI groups the wrong answers by *why* → tutor teaches to the biggest group → students revise → everyone leaves with targeted practice
 

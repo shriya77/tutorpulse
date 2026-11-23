@@ -39,9 +39,11 @@ interface Props {
   baseUrl?: string | null
   disabled?: boolean
   onDirtyChange?: (dirty: boolean) => void
+  /** Whether the pad shows any working (saved or new). */
+  onInkChange?: (hasInk: boolean) => void
 }
 
-export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseUrl, disabled, onDirtyChange }, ref) {
+export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseUrl, disabled, onDirtyChange, onInkChange }, ref) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [ops, setOps] = useState<Op[]>([])
@@ -129,6 +131,8 @@ export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseU
     const strokes = list.slice(lastClear + 1).some((o) => o.kind === 'stroke' && o.tool === 'pen')
     return !strokes && !(base && lastClear === -1)
   }
+  const hasInk = !isEmpty(ops)
+  useEffect(() => onInkChange?.(hasInk), [hasInk])
 
   useImperativeHandle(
     ref,

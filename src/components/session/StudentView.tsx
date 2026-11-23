@@ -113,6 +113,8 @@ function AnswerCard({
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [padDirty, setPadDirty] = useState(false)
+  const [padInk, setPadInk] = useState(false)
+  const [typedExplanation, setTypedExplanation] = useState(false) // keeps the box from vanishing mid-edit
   const pad = useRef<WorkPadHandle>(null)
   const { upload } = useR2Files() // private 'self' folder: only this student (and the checked route) can read it
   // The saved working, so a revision continues from it. Fetched once per submission row.
@@ -125,6 +127,12 @@ function AnswerCard({
       setExplanation(mine.data.explanation ?? '')
     }
   }, [mine?.recordId])
+
+  // With written working the one-line explanation is redundant (the tutor and the
+  // grouping read the working), so it only shows when the pad is empty, or when it
+  // already holds text that would still be sent.
+  const hasWorking = padInk || (!padDirty && !!mine?.data.workKey)
+  const showExplanation = !hasWorking || explanation.trim() !== '' || typedExplanation
 
   const unchanged =
     mine && !padDirty && mine.data.answer === answer.trim() && (mine.data.explanation ?? '') === explanation.trim()
@@ -175,7 +183,7 @@ function AnswerCard({
         <p className="-mt-1 text-xs text-muted-foreground">
           Write your steps here. Only your tutor sees them, and it helps them spot where things went off track.
         </p>
-        <WorkPad ref={pad} baseUrl={savedWorkUrl} disabled={locked || busy} onDirtyChange={setPadDirty} />
+        <WorkPad ref={pad} baseUrl={savedWorkUrl} disabled={locked || busy} onDirtyChange={setPadDirty} onInkChange={setPadInk} />
       </div>
 
       <div className="grid gap-1.5">
@@ -194,18 +202,25 @@ function AnswerCard({
           className="font-mono"
         />
       </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="explanation">How did you get it? (one line)</Label>
-        <Input
-          id="explanation"
-          data-testid="explanation-input"
-          value={explanation}
-          onChange={(e) => setExplanation(e.target.value)}
-          placeholder="e.g. used the power rule on each term"
-          disabled={locked}
-          maxLength={280}
-        />
-      </div>
+      {showExplanation && (
+        <div className="grid gap-1.5">
+          <Label htmlFor="explanation">
+            How did you get it? <span className="font-normal text-muted-foreground">(optional, one line)</span>
+          </Label>
+          <Input
+            id="explanation"
+            data-testid="explanation-input"
+            value={explanation}
+            onChange={(e) => {
+              setExplanation(e.target.value)
+              setTypedExplanation(true)
+            }}
+            placeholder="e.g. used the power rule on each term"
+            disabled={locked}
+            maxLength={280}
+          />
+        </div>
+      )}
 
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 

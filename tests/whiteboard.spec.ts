@@ -62,7 +62,8 @@ test('a student’s working reaches the tutor’s misconception group', async ({
     }
     await stroke([[0.08, 0.78], [0.7, 0.78]])
     await page.getByTestId('answer-input').fill('cos(3x^2)')
-    await page.getByTestId('explanation-input').fill('derivative of sin is cos')
+    // With working on the pad, the one-line explanation is not asked for.
+    await expect(page.getByTestId('explanation-input')).toHaveCount(0)
     await page.getByTestId('submit-answer').click()
     await expect(page.getByTestId('submit-status')).toContainText('Submitted', { timeout: 20_000 })
     await page.screenshot({ path: 'test-results/whiteboard-student.png', fullPage: true })
