@@ -71,6 +71,6 @@ test('a display name set in Settings shows in the app and on the tutor roster', 
     expect(await rows(a, at)).toHaveLength(0)
   } finally {
     await post(a, at, '/api/actions/setDisplayName', { name: '' })
-    await post(tutor, tt, '/api/actions/testCleanupPrivacyFixture', { sessionId })
+    await post(tutor, tt, '/api/actions/cleanupTestSession', { sessionId })
   }
 })

@@ -92,6 +92,6 @@ test('a follow-up check reaches only the misconception group', async ({ users })
     await card.scrollIntoViewIfNeeded()
     await tp.screenshot({ path: 'test-results/follow-up-tutor.png', fullPage: true })
   } finally {
-    await action(tutor, 'testCleanupPrivacyFixture', { sessionId, problemId })
+    await action(tutor, 'cleanupTestSession', { sessionId, problemId })
   }
 })

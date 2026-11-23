@@ -73,6 +73,6 @@ test('students opt in; the tutor sends each one their own recap once', async ({ 
     // A second send emails nobody twice.
     expect((await post(tutor, '/api/actions/sendRecaps', { sessionId })).data).toEqual({ sent: 0, testAccounts: 0, failed: 0 })
   } finally {
-    await post(tutor, '/api/actions/testCleanupPrivacyFixture', { sessionId })
+    await post(tutor, '/api/actions/cleanupTestSession', { sessionId })
   }
 })

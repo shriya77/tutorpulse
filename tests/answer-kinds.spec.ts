@@ -49,6 +49,6 @@ test('numbers, intervals, limits and t are checked exactly', async ({ users }) =
       expect({ key: c.key, isCorrect: row.data.isCorrect, needsReview: row.data.needsReview }).toEqual({ key: c.key, isCorrect: 1, needsReview: 0 })
     }
   } finally {
-    await post(tutor, tt, '/api/actions/testCleanupPrivacyFixture', { sessionId })
+    await post(tutor, tt, '/api/actions/cleanupTestSession', { sessionId })
   }
 })

@@ -6,10 +6,13 @@
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { test, expect, loadAllTestAccounts } from 'deepspace/testing'
+import { sessionCleanup } from './fixtures/cleanup'
 
 test.skip(process.env.RUN_AI_TESTS !== '1', 'AI/knowledge-billed: set RUN_AI_TESTS=1 to run (about $1 of credits per full run).')
 const PDF = 'tests/fixtures/notes-sample.pdf'
 test.skip(loadAllTestAccounts().length < 1 || !existsSync(PDF), 'Needs a test account and tests/fixtures/notes-sample.pdf.')
+
+const cleanUpLater = sessionCleanup()
 
 test('a PDF uploaded as notes gets indexed', async ({ users }) => {
   test.setTimeout(240_000)
@@ -18,6 +21,7 @@ test('a PDF uploaded as notes gets indexed', async ({ users }) => {
   await tutor.page.getByTestId('new-session-title').fill(`__test-${Date.now()}__ notes pdf`)
   await tutor.page.getByTestId('new-session-submit').click()
   await tutor.page.waitForURL(/\/sessions\//, { timeout: 20_000 })
+  cleanUpLater(tutor)
   await tutor.page.getByTestId('notes-input').setInputFiles({ name: 'worksheet.pdf', mimeType: 'application/pdf', buffer: readFileSync(PDF) })
   const status = tutor.page.getByTestId('note-status')
   await expect(status).toHaveText(/Ready for hints|Could not index|Skipped/, { timeout: 180_000 })

@@ -131,7 +131,7 @@ test('T5: forged and out-of-turn requests are refused', async ({ users }) => {
     expect((await action(tutor, 'closeSession', { sessionId })).body.success).toBe(true)
     expect((await action(a, 'joinSession', { joinCode: code })).body.success).toBe(false)
   } finally {
-    await tutor.api.post('/api/actions/testCleanupPrivacyFixture', {
+    await tutor.api.post('/api/actions/cleanupTestSession', {
       headers: { Authorization: `Bearer ${tutor.token}` },
       data: { sessionId, problemId },
     })

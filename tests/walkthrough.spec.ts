@@ -9,8 +9,11 @@
  * and ending the session.
  */
 import { test, expect, loadAllTestAccounts, type MultiplayerUser } from 'deepspace/testing'
+import { sessionCleanup } from './fixtures/cleanup'
 
 test.skip(loadAllTestAccounts().length < 3, 'Needs 3 usable test accounts.')
+
+const cleanUpLater = sessionCleanup()
 
 const shot = (u: MultiplayerUser, name: string) => u.page.screenshot({ path: `test-results/walkthrough-${name}.png`, fullPage: true })
 
@@ -23,6 +26,7 @@ test('walkthrough: wrong → cluster, revise → cluster gone, lock, next proble
   await tutor.page.getByTestId('new-session-title').fill(`__test-${Date.now()}__ Walkthrough`)
   await tutor.page.getByTestId('new-session-submit').click()
   await tutor.page.waitForURL(/\/sessions\//, { timeout: 20_000 })
+  cleanUpLater(tutor)
   const sessionUrl = new URL(tutor.page.url()).pathname
   const problemsToAdd = [['\\frac{d}{dx}\\sin(3x^2)', '6x*cos(3x^2)'], ['\\frac{d}{dx}(2x+1)^5', '10*(2x+1)^4']]
   for (const [i, [prompt, answer]] of problemsToAdd.entries()) {

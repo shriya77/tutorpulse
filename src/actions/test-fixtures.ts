@@ -9,8 +9,9 @@
  *      does not even look these up otherwise, so production answers 404);
  *   2. the caller and every user they name are `@deepspace.test` accounts.
  *
- * Every seeded session title starts with `__test-`, and cleanup only deletes
- * rows belonging to such a session created by the caller.
+ * Every seeded session title starts with `__test-`. Cleanup is the production
+ * `cleanupTestSession` action (src/actions/delete-session.ts), so live runs
+ * clean up too.
  */
 
 import { appFiles, isTestAccountEmail } from 'deepspace/worker'
@@ -79,39 +80,6 @@ const seedPrivacyFixture: ActionHandler<Env> = async ({ userId, params, tools }:
   }
 }
 
-const cleanupPrivacyFixture: ActionHandler<Env> = async ({ userId, params, tools }) => {
-  const sessionId = params.sessionId
-  if (typeof sessionId !== 'string') return { success: false, error: 'sessionId required' }
-  if (!(await isTestUser(tools, userId))) return { success: false, error: 'Test accounts only' }
-  const session = await tools.get('sessions', sessionId)
-  if (!session.success) return { success: true, data: { deleted: 0 } }
-  const title = (session.data.record.data as { title?: unknown }).title
-  if (session.data.record.createdBy !== userId || typeof title !== 'string' || !title.startsWith(TEST_TITLE_PREFIX)) {
-    return { success: false, error: 'Not a test session you created' }
-  }
-
-  let deleted = 0
-  // Keys of every problem in the session (follow-up checks have their own).
-  const problems = await tools.query('problems', { where: { sessionId }, limit: 100 })
-  for (const p of problems.success ? problems.data.records : []) {
-    if (p.recordId === params.problemId) continue
-    const res = await tools.deleteWhere('answerKeys', { problemId: p.recordId })
-    if (res.success) deleted += res.data.deleted
-  }
-  for (const collection of ['practiceSets', 'clusters', 'submissions', 'followUps', 'recapRequests', 'problems']) {
-    const res = await tools.deleteWhere(collection, { sessionId })
-    if (res.success) deleted += res.data.deleted
-  }
-  const problemId = params.problemId
-  if (typeof problemId === 'string') {
-    const res = await tools.deleteWhere('answerKeys', { problemId })
-    if (res.success) deleted += res.data.deleted
-  }
-  const removed = await tools.remove('sessions', sessionId)
-  if (removed.success) deleted += 1
-  return { success: true, data: { deleted } }
-}
-
 /**
  * Clustering evaluation: seeds problems with many realistic answers (from
  * placeholder student ids — there aren't enough test accounts to type them
@@ -177,6 +145,5 @@ const clusterEval: ActionHandler<Env> = async ({ userId, params, tools, env }) =
 
 export const testActions: Record<string, ActionHandler<Env>> = {
   testSeedPrivacyFixture: seedPrivacyFixture,
-  testCleanupPrivacyFixture: cleanupPrivacyFixture,
   testClusterEval: clusterEval,
 }

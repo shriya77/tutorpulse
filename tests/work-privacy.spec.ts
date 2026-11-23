@@ -127,6 +127,6 @@ test('T8: handwritten working is visible only to the student and their tutor', a
     expect((await tutor.api.get(`/api/submissions/${bSub.recordId}/work`, { headers: bearer(tutor) })).status()).toBe(200)
     expect((await a.api.get(`/api/submissions/${bSub.recordId}/work`, { headers: bearer(a) })).status(), 'A cannot see B').toBe(404)
   } finally {
-    await action(tutor, 'testCleanupPrivacyFixture', { sessionId, problemId })
+    await action(tutor, 'cleanupTestSession', { sessionId, problemId })
   }
 })

@@ -6,8 +6,11 @@
  */
 import type { Page } from '@playwright/test'
 import { test, expect, loadAllTestAccounts } from 'deepspace/testing'
+import { sessionCleanup } from './fixtures/cleanup'
 
 test.skip(loadAllTestAccounts().length < 2, 'Needs 2 usable test accounts.')
+
+const cleanUpLater = sessionCleanup()
 
 const PHONE = { width: 390, height: 844 }
 
@@ -38,6 +41,7 @@ test('main screens fit a phone', async ({ users }) => {
   await tutor.page.getByTestId('new-session-title').fill(`__test-${Date.now()}__ A long session title to test wrapping on phones`)
   await tutor.page.getByTestId('new-session-submit').click()
   await tutor.page.waitForURL(/\/sessions\//)
+  cleanUpLater(tutor)
   await tutor.page.locator('#new-prompt').fill('\\frac{d}{dx}\\left(\\sin(3x^2)+\\cos(5x^3)+e^{x^2}\\right)')
   await tutor.page.locator('#new-answer').fill('6x*cos(3x^2) - 15x^2*sin(5x^3) + 2x*e^(x^2)')
   await tutor.page.getByTestId('add-problem').click()

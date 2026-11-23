@@ -14,9 +14,12 @@
  */
 import { writeFileSync } from 'node:fs'
 import { test, expect, loadAllTestAccounts, type MultiplayerUser } from 'deepspace/testing'
+import { sessionCleanup } from './fixtures/cleanup'
 
 test.skip(process.env.RUN_AI_TESTS !== '1', 'AI/knowledge-billed: set RUN_AI_TESTS=1 to run (about $1 of credits per full run).')
 test.skip(loadAllTestAccounts().length < 3, 'Needs 3 usable test accounts.')
+
+const cleanUpLater = sessionCleanup()
 
 const NOTES = `# Chain rule — tutor notes
 
@@ -37,6 +40,7 @@ test('phase 3: notes, roster, drill-in, board, hints, practice set', async ({ us
   await tutor.page.getByTestId('new-session-title').fill(`__test-${Date.now()}__ Phase 3`)
   await tutor.page.getByTestId('new-session-submit').click()
   await tutor.page.waitForURL(/\/sessions\//, { timeout: 20_000 })
+  cleanUpLater(tutor)
   await tutor.page.locator('#new-prompt').fill('\\frac{d}{dx}\\sin(3x^2)')
   await tutor.page.locator('#new-answer').fill('6x*cos(3x^2)')
   await tutor.page.getByTestId('add-problem').click()

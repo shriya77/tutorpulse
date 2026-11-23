@@ -134,6 +134,6 @@ test('clustering evaluation on the demo problems', async ({ users }) => {
     writeFileSync(`test-results/clustering-eval${NO_IMAGES ? '-no-images' : ''}.txt`, report.join('\n'))
     console.log('[clustering-eval]\n' + report.join('\n'))
   } finally {
-    await tutor.context.request.post('/api/actions/testCleanupPrivacyFixture', { headers: auth, data: { sessionId } })
+    await tutor.context.request.post('/api/actions/cleanupTestSession', { headers: auth, data: { sessionId } })
   }
 })

@@ -98,6 +98,6 @@ test('a student’s working reaches the tutor’s misconception group', async ({
       )
       .toBeGreaterThan(100)
   } finally {
-    await action(tt, tutor, 'testCleanupPrivacyFixture', { sessionId, problemId })
+    await action(tt, tutor, 'cleanupTestSession', { sessionId, problemId })
   }
 })

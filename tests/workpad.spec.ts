@@ -210,6 +210,6 @@ test('the pad zooms, goes full screen, never selects text, and ignores palms', a
     await syntheticStroke(page, 'touch', 42)
     await expect(clear).toBeDisabled()
   } finally {
-    await post(tutor, tt, '/api/actions/testCleanupPrivacyFixture', { sessionId })
+    await post(tutor, tt, '/api/actions/cleanupTestSession', { sessionId })
   }
 })

@@ -19,6 +19,7 @@ import { JoinQr } from './JoinQr'
 import { NotesPanel } from './NotesPanel'
 import { PracticeSetPanel } from './PracticeSetPanel'
 import { RecapSender } from './RecapEmail'
+import { DeleteSession } from './DeleteSession'
 import { TopicPicker } from './TopicPicker'
 import { TutorRoster } from './TutorRoster'
 
@@ -36,6 +37,7 @@ export function TutorView({ session }: { session: Envelope<SessionData> }) {
         <TopicPicker session={session} />
         <ProblemEditor sessionId={session.recordId} problems={problems} keys={byProblem} />
         <NotesPanel sessionId={session.recordId} />
+        <DeleteSession session={session} />
       </div>
     )
   }
@@ -55,6 +57,7 @@ export function TutorView({ session }: { session: Envelope<SessionData> }) {
         {editing && session.data.status === 'open' && <TopicPicker session={session} />}
         {editing && session.data.status === 'open' && <NotesPanel sessionId={session.recordId} />}
       </section>
+      {session.data.status === 'closed' && <DeleteSession session={session} />}
     </div>
   )
 }
@@ -246,9 +249,10 @@ function ProblemBoardCard({
 }) {
   const sessions = useMutations<Partial<SessionData>>('sessions')
   const problems = useMutations<Partial<ProblemData>>('problems')
-  const isCurrent = session.data.currentProblemId === problem.recordId
-  const locked = problem.data.status === 'locked'
   const live = session.data.status === 'open'
+  // Only a live session is "showing" anything; once it ends no problem is highlighted.
+  const isCurrent = live && session.data.currentProblemId === problem.recordId
+  const locked = problem.data.status === 'locked'
   const grouping = problem.data.clusterState === 'running' || problem.data.clusterState === 'dirty'
   const wrong = stats.submitted - stats.correct
 

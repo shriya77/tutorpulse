@@ -7,9 +7,12 @@
  */
 import { readFileSync } from 'node:fs'
 import { test, expect, loadAllTestAccounts } from 'deepspace/testing'
+import { sessionCleanup } from './fixtures/cleanup'
 
 test.skip(process.env.RUN_AI_TESTS !== '1', 'AI-billed: set RUN_AI_TESTS=1 to run.')
 test.skip(loadAllTestAccounts().length < 3, 'Needs 3 usable test accounts.')
+
+const cleanUpLater = sessionCleanup()
 
 test('practice set: wrong answers → LaTeX PDF → share → student downloads it', async ({ users }) => {
   test.setTimeout(600_000)
@@ -19,6 +22,7 @@ test('practice set: wrong answers → LaTeX PDF → share → student downloads 
   await tutor.page.getByTestId('new-session-title').fill(`__test-${Date.now()}__ Practice set`)
   await tutor.page.getByTestId('new-session-submit').click()
   await tutor.page.waitForURL(/\/sessions\//, { timeout: 20_000 })
+  cleanUpLater(tutor)
   await tutor.page.locator('#new-prompt').fill('\\frac{d}{dx}\\sin(3x^2)')
   await tutor.page.locator('#new-answer').fill('6x*cos(3x^2)')
   await tutor.page.getByTestId('add-problem').click()

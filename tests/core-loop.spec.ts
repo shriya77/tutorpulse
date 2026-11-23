@@ -86,7 +86,7 @@ test('core loop: create → open → join → submit → live board → clusters
     if (sessionId) {
       const res = await tutor.context.request.post('/api/auth/token')
       const { token } = (await res.json()) as { token: string }
-      await tutor.context.request.post('/api/actions/testCleanupPrivacyFixture', {
+      await tutor.context.request.post('/api/actions/cleanupTestSession', {
         headers: { Authorization: `Bearer ${token}` },
         data: { sessionId },
       })

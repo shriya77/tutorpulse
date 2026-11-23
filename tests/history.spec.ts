@@ -62,6 +62,6 @@ test('history shows a student across sessions, to their tutor only', async ({ us
     expect(theirs.success).toBe(true)
     for (const id of made) expect(JSON.stringify(theirs.data)).not.toContain(id)
   } finally {
-    for (const sessionId of made) await post(tutor, tt, '/api/actions/testCleanupPrivacyFixture', { sessionId })
+    for (const sessionId of made) await post(tutor, tt, '/api/actions/cleanupTestSession', { sessionId })
   }
 })

@@ -158,6 +158,6 @@ test('T4: students cannot read other students’ work, the answer key, clusters,
     const anon = await tutor.api.post('/api/actions/testSeedPrivacyFixture', { data: {} })
     expect(anon.status()).toBe(401)
   } finally {
-    await action(tutor, 'testCleanupPrivacyFixture', { sessionId: ids.sessionId, problemId: ids.problemId })
+    await action(tutor, 'cleanupTestSession', { sessionId: ids.sessionId, problemId: ids.problemId })
   }
 })

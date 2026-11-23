@@ -124,6 +124,6 @@ test('a photo of paper working reaches the tutor without its EXIF', async ({ use
       console.log('[photo] group:', await tp.getByTestId('cluster-label').first().textContent(), '|', await tp.getByTestId('cluster').first().locator('p').first().textContent())
     }
   } finally {
-    await post(tutor, tt, '/api/actions/testCleanupPrivacyFixture', { sessionId, problemId })
+    await post(tutor, tt, '/api/actions/cleanupTestSession', { sessionId, problemId })
   }
 })
