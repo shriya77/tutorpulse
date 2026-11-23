@@ -58,6 +58,9 @@ export type ChatPanelProps = {
   models?: ModelOption[]
   /** Clickable prompts shown when the conversation is empty. */
   emptyStatePrompts?: string[]
+  /** Heading and one line shown when the conversation is empty. */
+  emptyStateTitle?: string
+  emptyStateText?: string
   /** Applied to the outer container. */
   className?: string
   /** Optional content rendered above the messages. */
@@ -87,6 +90,8 @@ export function ChatPanel({
   onChatCreated,
   models: modelOptions,
   emptyStatePrompts = DEFAULT_PROMPTS,
+  emptyStateTitle,
+  emptyStateText,
   className,
   header,
   compact = false,
@@ -257,7 +262,7 @@ export function ChatPanel({
         className={`min-h-0 flex-1 overflow-y-auto ${horizontalPadding} py-8`}
       >
         {messages.length === 0 ? (
-          <EmptyState prompts={emptyStatePrompts} onPick={selectPrompt} />
+          <EmptyState prompts={emptyStatePrompts} onPick={selectPrompt} title={emptyStateTitle} text={emptyStateText} />
         ) : (
           <div className={`mx-auto flex max-w-[44rem] flex-col ${turnGap}`}>
             {messages.map((message) => (

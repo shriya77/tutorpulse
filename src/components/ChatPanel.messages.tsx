@@ -77,18 +77,22 @@ export const MessageTurn = memo(function MessageTurn({
 export function EmptyState({
   prompts,
   onPick,
+  title = 'How can I help?',
+  text = 'Ask a question to get started.',
 }: {
   prompts: string[]
   onPick: (prompt: string) => void
+  title?: string
+  text?: string
 }) {
   return (
     <div className="mx-auto flex h-full max-w-[28rem] flex-col items-start justify-center gap-4 px-2">
       <div className="space-y-1">
         <h2 className="text-[17px] font-medium tracking-tight text-foreground">
-          How can I help?
+          {title}
         </h2>
         <p className="text-[13px] leading-relaxed text-muted-foreground">
-          I can inspect collections and help update records using your permissions.
+          {text}
         </p>
       </div>
       <div className="flex flex-col gap-0.5 pt-2">

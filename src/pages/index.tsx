@@ -9,7 +9,7 @@ import { Seo } from '../components/Seo'
 import { seo } from '../seo'
 
 const STEPS = [
-  { title: 'Students submit', body: 'Join with a 6-letter code or QR from a phone, then type an answer and one line on how they got it.' },
+  { title: 'Students submit', body: 'Join with a 6-letter code or QR from a phone, write the working on a sketch pad or snap a photo of paper, and type the final answer.' },
   { title: 'See why, not just who', body: 'Answers are checked exactly; the wrong ones are grouped into named misconceptions on your board, live.' },
   { title: 'Teach the biggest group', body: 'Put a misconception on everyone’s screen, explain it once, and watch the count fall as students revise.' },
   { title: 'Leave with practice', body: 'End the session and get a PDF of new problems that target the mistakes your group actually made.' },

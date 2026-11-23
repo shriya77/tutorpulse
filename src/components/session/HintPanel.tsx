@@ -29,7 +29,15 @@ export function HintPanel({ userId }: { userId: string }) {
       </div>
       {open && (
         <div className="h-[28rem] border-t border-border" data-testid="hint-panel">
-          <ChatPanel chatId={null} userId={userId} models={HINT_MODELS} emptyStatePrompts={PROMPTS} compact />
+          <ChatPanel
+            chatId={null}
+            userId={userId}
+            models={HINT_MODELS}
+            emptyStatePrompts={PROMPTS}
+            emptyStateTitle="Stuck on this problem?"
+            emptyStateText="Ask about the step you're on. I'll answer with a question or a nudge, never the final answer."
+            compact
+          />
         </div>
       )}
     </section>
