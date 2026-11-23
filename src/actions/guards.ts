@@ -87,3 +87,13 @@ export async function loadSessionProblem(
   if (!session || session.createdBy !== problem.createdBy) return { ok: false, error: PROBLEM_NOT_FOUND }
   return { ok: true, problem }
 }
+
+/**
+ * The caller's own sessions (they are the tutor of each), newest first.
+ * The history page's only entry point: every later query is scoped to these ids.
+ */
+export async function listTutorSessions(ctx: GuardContext, limit = 20): Promise<Envelope<SessionData>[]> {
+  const res = await ctx.tools.query<SessionData>('sessions', { where: { createdBy: ctx.userId }, orderBy: 'createdAt', orderDir: 'desc', limit })
+  if (!res.success) return []
+  return (res.data.records as Envelope<SessionData>[]).filter((s) => s.createdBy === ctx.userId)
+}

@@ -12,6 +12,7 @@ import { generatePracticeSet, publishPracticeSet } from './practice-set-actions'
 import { addSessionNotes, refreshSessionNotes } from './notes-actions'
 import { submitAnswer } from './submit-answer'
 import { draftFollowUp, sendFollowUp } from './follow-up-actions'
+import { tutorHistory } from './history-actions'
 
 export const actions: Record<string, ActionHandler<Env>> = {
   openSession,
@@ -24,4 +25,5 @@ export const actions: Record<string, ActionHandler<Env>> = {
   refreshSessionNotes,
   draftFollowUp,
   sendFollowUp,
+  tutorHistory,
 }

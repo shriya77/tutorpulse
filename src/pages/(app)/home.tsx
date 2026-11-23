@@ -157,7 +157,14 @@ function SessionLists() {
         { title: 'Sessions you joined', rows: joined, empty: 'None yet. Enter a code above.' },
       ].map((list) => (
         <section key={list.title} aria-label={list.title} className="min-w-0 space-y-3">
-          <h2 className="font-display text-lg font-semibold text-foreground">{list.title}</h2>
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="font-display text-lg font-semibold text-foreground">{list.title}</h2>
+            {list.title === 'Sessions you run' && list.rows.length > 0 && (
+              <Link to="/history" className="text-sm font-medium text-primary hover:underline" data-testid="history-link">
+                Students over time →
+              </Link>
+            )}
+          </div>
           {list.rows.length === 0 ? (
             <p className="text-sm text-muted-foreground">{list.empty}</p>
           ) : (
