@@ -20,6 +20,7 @@ import { NotesPanel } from './NotesPanel'
 import { PracticeSetPanel } from './PracticeSetPanel'
 import { RecapSender } from './RecapEmail'
 import { ManageSession } from './ManageSession'
+import { TimerBadge, TimerControls } from './ProblemTimer'
 import { TopicPicker } from './TopicPicker'
 import { TutorRoster } from './TutorRoster'
 
@@ -183,6 +184,8 @@ interface ProblemStats {
   submitted: number
   correct: number
   needsReview: number
+  /** Who answered (for "N of M answered", which counts only students still in the session). */
+  studentIds: Set<string>
 }
 
 function Board({
@@ -208,8 +211,9 @@ function Board({
   const stats = useMemo(() => {
     const m = new Map<string, ProblemStats>()
     for (const s of submissions as Envelope<SubmissionData>[]) {
-      const st = m.get(s.data.problemId) ?? { submitted: 0, correct: 0, needsReview: 0 }
+      const st = m.get(s.data.problemId) ?? { submitted: 0, correct: 0, needsReview: 0, studentIds: new Set<string>() }
       st.submitted++
+      st.studentIds.add(s.data.studentId)
       if (s.data.isCorrect === 1) st.correct++
       if (s.data.needsReview === 1) st.needsReview++
       m.set(s.data.problemId, st)
@@ -247,7 +251,7 @@ function Board({
             index={i}
             problem={p}
             session={session}
-            stats={stats.get(p.recordId) ?? { submitted: 0, correct: 0, needsReview: 0 }}
+            stats={stats.get(p.recordId) ?? { submitted: 0, correct: 0, needsReview: 0, studentIds: new Set<string>() }}
             clusters={clustersByProblem.get(p.recordId) ?? []}
             submissionById={submissionById}
           />
@@ -259,7 +263,7 @@ function Board({
                   index={i}
                   problem={f}
                   session={session}
-                  stats={stats.get(f.recordId) ?? { submitted: 0, correct: 0, needsReview: 0 }}
+                  stats={stats.get(f.recordId) ?? { submitted: 0, correct: 0, needsReview: 0, studentIds: new Set<string>() }}
                   clusters={clustersByProblem.get(f.recordId) ?? []}
                   submissionById={submissionById}
                   followUp={followUpInfo.get(f.recordId) ?? { label: '', students: 0 }}
@@ -292,6 +296,9 @@ function ProblemBoardCard({
   const locked = problem.data.status === 'locked'
   const grouping = problem.data.clusterState === 'running' || problem.data.clusterState === 'dirty'
   const wrong = stats.submitted - stats.correct
+  const participantIds = Array.isArray(session.data.participantIds) ? session.data.participantIds : []
+  const joined = participantIds.length
+  const answered = participantIds.filter((id) => stats.studentIds.has(id)).length
 
   return (
     <article
@@ -309,9 +316,11 @@ function ProblemBoardCard({
           )}
           {isCurrent && <Badge variant="info">Showing to students</Badge>}
           {locked && <Badge variant="outline">Locked</Badge>}
+          {isCurrent && <TimerBadge session={session} problemId={problem.recordId} />}
         </div>
         {live && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {isCurrent && !locked && <TimerControls session={session} problemId={problem.recordId} />}
             {!isCurrent && !followUp && (
               <Button size="sm" variant="outline" disabled={!sessions.ready} onClick={() => sessions.put(session.recordId, { currentProblemId: problem.recordId })}>
                 Show to students
@@ -336,6 +345,12 @@ function ProblemBoardCard({
         <Stat label="Correct" value={stats.correct} testId="stat-correct" tone="bg-success/12" />
         <Stat label="Not yet correct" value={wrong} testId="stat-wrong" tone="bg-highlight/30" />
       </dl>
+      {isCurrent && !followUp && joined > 0 && (
+        <p className="mt-2 text-sm text-muted-foreground" data-testid="answered-of">
+          {answered} of {joined} answered
+          {answered === joined ? ' · everyone’s in' : ''}
+        </p>
+      )}
       {stats.needsReview > 0 && (
         <p className="mt-2 text-xs text-muted-foreground">{stats.needsReview} answer{stats.needsReview === 1 ? '' : 's'} couldn’t be checked automatically (counted as not yet correct).</p>
       )}

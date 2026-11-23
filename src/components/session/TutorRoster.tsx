@@ -40,6 +40,12 @@ export function TutorRoster({ session, problems }: { session: Envelope<SessionDa
   }, [peers, session.data.participantIds, getName, problemNumber, displayNames])
 
   const stuckCount = rows.filter((r) => r.stuck).length
+  // Who the room is waiting on for the problem being shown: online, on it, not yet answered.
+  // Only named when most are done, as a nudge (these names are tutor-only, like the rest of the roster).
+  const current = session.data.currentProblemId ? problemNumber.get(session.data.currentProblemId) : undefined
+  const onCurrent = rows.filter((r) => r.online && current !== undefined && r.problem === current)
+  const waiting = onCurrent.filter((r) => !r.submitted)
+  const showWaiting = waiting.length > 0 && waiting.length <= 3 && waiting.length < onCurrent.length
 
   return (
     <section aria-label="Students" className="rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] p-4" data-testid="roster">
@@ -52,12 +58,19 @@ export function TutorRoster({ session, problems }: { session: Envelope<SessionDa
         )}
         {!connected && <span className="text-xs text-muted-foreground">Reconnecting…</span>}
       </div>
+      {showWaiting && (
+        <p className="mb-2 text-sm text-foreground" data-testid="roster-waiting">
+          <span className="text-muted-foreground">Waiting on </span>
+          {waiting.map((r) => r.name).join(', ')}
+          <span className="text-muted-foreground"> for P{current}</span>
+        </p>
+      )}
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">No one has joined yet. Share the join code.</p>
       ) : (
         <ul className="divide-y divide-border">
           {rows.map((r) => (
-            <li key={r.id} className="flex items-center justify-between gap-3 py-2" data-testid="roster-row">
+            <li key={r.id} className="flex items-center justify-between gap-3 py-2" data-testid="roster-row" data-student-id={r.id}>
               <span className="flex min-w-0 items-center gap-2">
                 <span
                   aria-hidden

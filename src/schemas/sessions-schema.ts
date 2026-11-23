@@ -34,6 +34,11 @@ export const sessionsSchema: CollectionSchema = {
     { name: 'hintTurns', storage: 'number', interpretation: 'plain', default: 0 },
     /** Server-only: AI follow-up drafts used (cap in src/lib/limits.ts). */
     { name: 'followUpDrafts', storage: 'number', interpretation: 'plain', default: 0 },
+    /** Optional countdown on the problem being shown: when it ends (ISO) and which problem it's for. Tutor-set. */
+    { name: 'timerEndsAt', storage: 'text', interpretation: 'plain', default: '' },
+    { name: 'timerProblemId', storage: 'text', interpretation: 'plain', default: '' },
+    /** Server-only (set by `sendRecaps`): when the tutor last sent recap emails. Students then stop seeing the opt-in. */
+    { name: 'recapsSentAt', storage: 'text', interpretation: 'plain', default: '' },
     /** Server-only (set by `removeStudent`): students the tutor removed; the join code no longer lets them in. */
     { name: 'removedIds', storage: 'text', interpretation: { kind: 'json' }, default: [] },
     /** 1 = the tutor archived it: tucked away under "Archived" on their home page. Only changes the tutor's own list. */
@@ -48,7 +53,7 @@ export const sessionsSchema: CollectionSchema = {
       create: true,
       update: 'own',
       delete: 'own',
-      writableFields: ['title', 'topic', 'currentProblemId', 'focusLabel', 'archived'],
+      writableFields: ['title', 'topic', 'currentProblemId', 'focusLabel', 'archived', 'timerEndsAt', 'timerProblemId'],
     },
     admin: ADMIN_ALL,
   },

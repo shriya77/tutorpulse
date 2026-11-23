@@ -19,6 +19,9 @@ export type SessionData = {
   followUpDrafts?: number
   archived?: number
   removedIds?: string[]
+  timerEndsAt?: string
+  timerProblemId?: string
+  recapsSentAt?: string
 }
 
 export type ProblemData = {
