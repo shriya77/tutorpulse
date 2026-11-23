@@ -13,6 +13,7 @@ import { Button, Input, Label } from '@/components/ui'
 import { useMyDisplayName } from '../../../hooks/useDisplayName'
 import { callAction } from '../../../lib/callAction'
 import { MAX_DISPLAY_NAME } from '../../../lib/displayName'
+import { getColorMode, setColorMode, type ColorMode } from '../../../lib/colorMode'
 
 export default function SettingsPage() {
   const { user } = useUser()
@@ -100,7 +101,49 @@ export default function SettingsPage() {
             Sign out
           </Button>
         </section>
+
+        <Appearance />
       </div>
     </div>
+  )
+}
+
+const MODES: Array<{ value: ColorMode; label: string; hint: string }> = [
+  { value: 'system', label: 'System', hint: 'Match this device' },
+  { value: 'light', label: 'Light', hint: 'Paper' },
+  { value: 'dark', label: 'Dark', hint: 'Notebook at night' },
+]
+
+/** Light / dark mode, saved on this device. The sketch pad stays light paper either way. */
+function Appearance() {
+  const [mode, setMode] = useState<ColorMode>(() => getColorMode())
+  return (
+    <section className="mt-6 space-y-3 rounded-lg border border-border bg-card p-6" aria-labelledby="appearance-title">
+      <h2 id="appearance-title" className="text-lg font-semibold">Appearance</h2>
+      <div role="radiogroup" aria-labelledby="appearance-title" className="grid grid-cols-3 gap-2">
+        {MODES.map((m) => (
+          <label
+            key={m.value}
+            className={`relative flex cursor-pointer flex-col rounded-lg border px-3 py-2 text-sm has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring ${mode === m.value ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:bg-secondary'}`}
+          >
+            <input
+              type="radio"
+              name="color-mode"
+              value={m.value}
+              checked={mode === m.value}
+              onChange={() => {
+                setMode(m.value)
+                setColorMode(m.value)
+              }}
+              className="sr-only"
+              data-testid={`color-mode-${m.value}`}
+            />
+            <span className="font-medium text-foreground">{m.label}</span>
+            <span className="text-xs text-muted-foreground">{m.hint}</span>
+          </label>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">Saved on this device. The sketch pad stays light paper either way, so your working looks the same to your tutor.</p>
+    </section>
   )
 }

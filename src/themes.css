@@ -88,3 +88,46 @@
   --color-shell: #f6f1e7;
   --color-shell-panel: #ffffff;
 }
+
+/*
+ * Notebook at night — TutorPulse's dark mode. Same notebook, desk lamp off:
+ * deep ink-blue paper, chalk-white text, a softer blue for actions and a
+ * darker amber highlighter so light text stays readable on it. Every text
+ * pairing is at least WCAG AA (checked when the theme was made). The
+ * sketch pad keeps its light paper in both modes (WorkPad.tsx).
+ */
+[data-theme="notebook-night"] {
+  color-scheme: dark;
+  --color-background: #141b24;
+  --color-foreground: #ece6da;
+  --color-card: #1b2430;
+  --color-card-foreground: #ece6da;
+  --color-popover: #1b2430;
+  --color-popover-foreground: #ece6da;
+  --color-primary: #8fb0ff;
+  --color-primary-foreground: #0f1620;
+  --color-secondary: #243041;
+  --color-secondary-foreground: #ece6da;
+  --color-muted: #1f2833;
+  --color-muted-foreground: #a5aebb;
+  --color-accent: #3a3214;
+  --color-accent-foreground: #ece6da;
+  --color-destructive: #f2766b;
+  --color-destructive-foreground: #1a0f0e;
+  --color-border: #2c3846;
+  --color-input: #3a4757;
+  --color-ring: #8fb0ff;
+  --color-highlight: #7a5f05;
+  --color-grid: #1a2330;
+  --color-success: #4cc38a;
+  --color-success-foreground: #0f1a14;
+  --color-warning: #f5b324;
+  --color-warning-foreground: #1d2b3a;
+  --color-info: #8fb0ff;
+  --color-info-foreground: #0f1620;
+  --radius: 0.75rem;
+  --shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 4px 14px 0 rgba(0, 0, 0, 0.4);
+  --color-shell: #10161e;
+  --color-shell-panel: #1b2430;
+}

@@ -23,10 +23,20 @@
       in src/styles.css (slate) / src/themes.css; keep them in sync when
       adding or editing themes.
     -->
+    <script>
+      // Light or dark before the first paint (src/lib/colorMode.ts keeps it in sync afterwards).
+      try {
+        var m = localStorage.getItem('tutorpulse-color-mode')
+        if (m === 'dark' || (m !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.setAttribute('data-theme', 'notebook-night')
+        }
+      } catch (e) {}
+    </script>
     <style>
       html { background-color: #0a0a0a; color-scheme: dark; }
       html[data-theme="paper"] { background-color: #ffffff; color-scheme: light; }
       html[data-theme="notebook"] { background-color: #fbf8f2; color-scheme: light; }
+      html[data-theme="notebook-night"] { background-color: #141b24; color-scheme: dark; }
       /* Add one line per theme you create, mirroring its --color-background. */
     </style>
   </head>

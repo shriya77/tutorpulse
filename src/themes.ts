@@ -23,6 +23,11 @@ export const THEMES = [
     description: 'TutorPulse: warm paper, ink-blue actions, highlighter-yellow marks.',
   },
   {
+    id: 'notebook-night',
+    label: 'Notebook at night',
+    description: 'TutorPulse dark mode: deep ink-blue paper, chalk-white text, a darker amber highlighter.',
+  },
+  {
     id: 'slate',
     label: 'Slate',
     description: 'Neutral dark placeholder default. Replace with your own theme.',

@@ -37,6 +37,9 @@ const EXPORT_WIDTH = 800
 const PEN_WIDTH = 0.006
 const ERASER_WIDTH = 0.045
 const INK = '#1d2b3a'
+/** The pad's sheet and grid (the Notebook theme's light paper), the same in light and dark mode. */
+const PAPER = '#fbf8f2'
+const PAPER_GRID = '#f0eadd'
 export const MIN_ZOOM = 0.5
 export const MAX_ZOOM = 4
 const ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2, 3, 4]
@@ -267,9 +270,9 @@ export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseU
       ctx.setTransform(dpr, 0, 0, dpr, -v.x * s * dpr, -v.y * s * dpr)
       paintInk(ctx, s, list, h)
       // Paper and grid go *behind* the ink, so the eraser never erases them.
-      const css = getComputedStyle(document.documentElement)
+      // Fixed paper colours, not theme tokens: in dark mode the pad stays a light sheet so the dark ink shows.
       ctx.globalCompositeOperation = 'destination-over'
-      ctx.strokeStyle = css.getPropertyValue('--color-grid').trim() || '#ece6da'
+      ctx.strokeStyle = PAPER_GRID
       ctx.lineWidth = 1
       ctx.beginPath()
       const cell = s / GRID_CELLS
@@ -282,7 +285,7 @@ export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseU
         ctx.lineTo(s, Math.round(y) + 0.5)
       }
       ctx.stroke()
-      ctx.fillStyle = css.getPropertyValue('--color-background').trim() || '#faf8f3'
+      ctx.fillStyle = PAPER
       ctx.fillRect(0, 0, s, s * h)
       ctx.globalCompositeOperation = 'source-over'
     },
@@ -360,6 +363,8 @@ export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseU
     // No text selection, no focus change, no page scroll from a stroke.
     e.preventDefault()
     selectionLock.hold()
+    // preventDefault above also stops focus moving; focus the pad so Ctrl/⌘+Z goes to it.
+    if (!expanded) wrapRef.current?.focus({ preventScroll: true })
     try {
       e.currentTarget.setPointerCapture(e.pointerId)
     } catch {
@@ -464,13 +469,26 @@ export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseU
   // Never leave the page unable to select text.
   useEffect(() => () => selectionLock.releaseSoon(0), [])
 
+  // Ctrl/⌘+Z undoes the last stroke: while the pad (or something in it) has focus, or anywhere in full screen.
+  const undoKey = (e: KeyboardEvent | React.KeyboardEvent) => {
+    if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== 'z') return false
+    const t = e.target as HTMLElement | null
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return false
+    e.preventDefault()
+    if (!disabled) setOps((l) => l.slice(0, -1))
+    return true
+  }
+
   // Esc leaves full screen.
   useEffect(() => {
     if (!expanded) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setExpanded(false)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setExpanded(false)
+      else undoKey(e)
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [expanded])
+  }, [expanded, disabled])
 
   /** Step the zoom from the buttons, keeping the middle of the view in place. */
   const stepZoom = (dir: 1 | -1) => {
@@ -551,7 +569,14 @@ export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseU
     return (
       <div className="grid select-none gap-2 [-webkit-touch-callout:none]" data-testid="work-pad">
         {toolbar}
-        <div ref={wrapRef} className="overflow-hidden rounded-xl border border-input bg-muted/60">
+        <div
+          ref={wrapRef}
+          tabIndex={0}
+          role="group"
+          aria-label="Drawing pad. Ctrl or Command plus Z undoes the last stroke."
+          onKeyDown={(e) => undoKey(e)}
+          className="overflow-hidden rounded-xl border border-input bg-muted/60 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
           {canvas}
         </div>
         {/* On a phone the tips fold behind a "?" so they don't take three lines under every problem. */}
