@@ -95,6 +95,7 @@ flowchart LR
 | **AI chat + custom tools** (`ChatPanel`, `registerAgent`) | Read-only Socratic hint assistant with `get_current_problem` / `search_notes` | `src/ai` |
 | **LaTeX compiler integration** (`latex-compiler/compile` via `buildCronContext().integrations.call`) | Typesets the practice-set PDF. Claude writes the problems as structured data; mathjs writes each derivative question and works out (or checks) its answer; the server builds the `.tex` itself, with a pgfplots chart of the exact correct rates, escaped text and an allowlist of maths commands, so AI output can't run `\input` or `\write` | `src/jobs/practice-set.ts`, `src/lib/practiceLatex.ts` |
 | **Anthropic sandbox** (`codeExecutionTool`, `sandboxFiles`) | Fallback: if the LaTeX path fails, Python in the sandbox writes the PDF instead | `src/jobs/practice-set.ts` |
+| **Email integration** (`email/send` via `ctx.tools.integration`) | Opt-in recap emails after a session: each student who ticked the box gets only their own results | `src/actions/recap-actions.ts`, `src/lib/recapEmail.ts` |
 | **Managed knowledge** (`knowledge(env).scoped`) | Hints grounded in the tutor's own notes, one folder per session | `src/actions/notes-actions.ts`, `src/ai/tools.ts` |
 | **Local agent tools** (`registerAgent`) | `npx deepspace agent invoke tutorpulse sessionReport` gives the tutor's own coding agent a session report (tutor-only, counts and labels only) | `src/ai/tools.ts`, `src/lib/sessionReport.ts` |
 | Multi-user testing (`users` fixture) | Tutor + 2 students in one Playwright test | `tests/` |
@@ -157,6 +158,8 @@ Test-account emails are global across all DeepSpace developers, so add a unique 
 | `tests/work-photo.spec.ts` | Photo working: EXIF (incl. GPS) stripped on the phone, a raw EXIF photo refused, the AI reads it |
 | `tests/answer-kinds.spec.ts` | Number lists, intervals, DNE and an expression in t, marked correct through `submitAnswer` |
 | `tests/history.spec.ts` | Tutor history across sessions; a student gets none of it; no emails in the response |
+| `tests/recap-email.spec.ts` | Recap opt-in is off by default; only the session's tutor can send, once the session has ended; nobody reads or forges another student's opt-in; each student is emailed at most once (test accounts are never really emailed) |
+| `tests/practice-set.spec.ts` | Practice set alone: PDF typeset by LaTeX (pdfTeX producer), shared, downloaded by a student. **AI-billed** |
 
 Run any spec against the deployed app with `npx playwright test -c tests/playwright.live.config.ts tests/<spec>`. The test-only seed actions used by T4 and the eval exist only when `ALLOW_DEBUG_ROUTES=true` (local), and only for `@deepspace.test` accounts.
 
@@ -167,7 +170,7 @@ git commit -am "…" && npx deepspace deploy
 node scripts/seed-demo.ts         # dev-only: creates the demo session for the CLI's logged-in account
 ```
 
-No API keys live in this repo. AI, the LaTeX compiler, the sandbox and knowledge all go through the DeepSpace platform, billed to the app owner with per-session caps (`src/lib/limits.ts`: 30 clustering runs, 5 practice sets, 200 hint turns, 15 follow-up drafts). `.dev.vars` is generated and git-ignored.
+No API keys live in this repo. AI, the LaTeX compiler, email, the sandbox and knowledge all go through the DeepSpace platform, billed to the app owner with per-session caps (`src/lib/limits.ts`: 30 clustering runs, 5 practice sets, 200 hint turns, 15 follow-up drafts, recap emails at most once per student per session). `.dev.vars` is generated and git-ignored.
 
 ---
 
@@ -183,7 +186,7 @@ npx deepspace agent invoke tutorpulse sessionReport          # your most recent 
 2. **Students:** scan the QR code or enter the code at `/home`, sign in, and answer. Try `cos(3x^2)` with "derivative of sin is cos" for a wrong answer, and `6x cos(3x²)` for a right one.
 3. **Board:** watch the counts and the named cluster appear within seconds. Click **Show answers**, then **Take to board**; students see "Discussing: …". Students tap **I'm stuck** or **Hint**.
 4. **Revise:** **Re-open answers**; a student fixes their answer and the cluster count falls.
-5. **Wrap up:** **End session** → **Generate practice set** (about a minute) → **Download to review** → **Share with students** → students download the PDF. (Generation is a deliberate click rather than automatic, so AI credits are only spent when the tutor wants a set.)
+5. **Wrap up:** **End session** → **Generate practice set** (about a minute) → **Download to review** → **Share with students** → students download the PDF → **Email recaps** to students who ticked "Email me a recap". (Generation is a deliberate click rather than automatic, so AI credits are only spent when the tutor wants a set.)
 
 ## Whiteboard: grouping by the working, not just the answer
 
@@ -195,10 +198,11 @@ Students can write their steps on a sketch pad under each problem (finger, stylu
 - **Photos of paper.** Most students work on paper, so "Use a photo of paper instead" takes a picture. The phone shrinks it and re-encodes it as JPEG, which drops the EXIF block (camera details and **GPS location**). The server accepts only a PNG drawing or an EXIF-free JPEG, so a raw phone photo uploaded some other way is refused rather than passing a location on to the tutor (`tests/work-photo.spec.ts`).
 - **Does it help?** On a set built the way real rooms look (vague notes; one wrong answer, 7/(x−3)², reached by two different mistakes), agreement with the intended groups was **0.92 without the images and 1.00 with them** (`docs/clustering-eval/5-…`, `6-…`; one run each, so treat it as a sign, not a benchmark). The eval images are typed text in a handwriting font (`docs/clustering-eval/sample-working.png`), not real handwriting.
 
-## Follow-up checks, answer kinds, history
+## Follow-up checks, answer kinds, recap emails, history
 
 - **"Check it landed."** Students re-answering the same problem right after the explanation is weak evidence. From any misconception group, the tutor can have the AI draft one fresh problem aimed at the same mistake, review it, and send it to that group only. For derivative questions the AI only suggests the function; mathjs writes the prompt and differentiates it for the key, so the key is exact ("worked out by maths"); anything else is marked for the tutor to check. It becomes a normal tutor-owned problem plus one server-written `followUps` row per student, readable by that student and the tutor only, so nobody learns who else was in the group; `submitAnswer` refuses it from anyone else. The board shows "2 of 3 now get it right".
 - **More kinds of answers.** The key's form picks the comparison: expressions in x, t or θ; numbers (`x = -1, 3`, any order, `±2`); intervals (`(-inf, 2) U (3, inf)` or `x < 2 or x > 3`); limits (`DNE`, `inf`). Writing this found and fixed an allowlist gap: names used as function arguments (`sin(y)`) skipped the check.
+- **Recap emails (opt-in).** A student can tick "Email me a recap of this session" (off by default, per session). After the session ends, the tutor clicks **Email N recaps** and each of those students gets one email through the DeepSpace `email/send` integration with **only their own results**: right or not for each problem, their own answer, the name of their mistake group, and a link back (pointing to the practice set if it's shared). Never the answer key, other students, or the AI's explanation (written for the tutor, and it may quote others' answers). Addresses are read on the server and never stored, logged or returned; the tutor only sees counts. `sentAt` stops anyone being emailed twice, and `@deepspace.test` accounts are marked but never emailed, so tests send no real mail. The opt-in lives in `recapRequests`, which only server actions write.
 - **History** (`/history`, linked from home). Each student's correct rate session by session and the misconceptions that came back across sessions, plus a summary of every session. It names students, so it is a tutor-only page, never the projected board; `tutorHistory` reads only sessions the caller ran and returns display names only.
 
 ## Known limitations / next steps
