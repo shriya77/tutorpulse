@@ -2,7 +2,7 @@
 
 **A live room for group tutoring that shows the tutor _why_ students get a problem wrong, while the session is still running.**
 
-Students join with a 6-character code or QR code and submit an answer, with their working on a sketch pad (or, without it, an optional line on how they got it). Answers are checked **deterministically** with mathjs. The wrong ones are grouped by Claude into named **misconception clusters** ("Dropped the inner derivative — 7") that update live on the tutor's board. The tutor puts a cluster on every student's screen, explains it, re-opens answers and watches the count fall. When the session ends, the app writes a **practice-set PDF** in Anthropic's sandbox that targets the group's actual mistakes. Students also get a read-only, Socratic **hint assistant** grounded in the tutor's uploaded notes.
+Students join with a 6-character code or QR code and submit an answer, with their working on a sketch pad (or, without it, an optional line on how they got it). Answers are checked **deterministically** with mathjs. The wrong ones are grouped by Claude into named **misconception clusters** ("Dropped the inner derivative — 7") that update live on the tutor's board. The tutor puts a cluster on every student's screen, explains it, re-opens answers and watches the count fall. When the session ends, the app writes a **practice-set PDF**, typeset with LaTeX, that targets the group's actual mistakes, with every derivative answer worked out by computer algebra. Students also get a read-only, Socratic **hint assistant** grounded in the tutor's uploaded notes.
 
 > students submit → AI groups the wrong answers by *why* → tutor teaches to the biggest group → students revise → everyone leaves with targeted practice
 
@@ -32,7 +32,8 @@ flowchart LR
   end
   subgraph Platform["DeepSpace platform"]
     AI["AI proxy<br/>Claude Haiku / Sonnet"]
-    SB["Anthropic sandbox<br/>(Python → PDF)"]
+    LX["LaTeX compiler<br/>(practice-set PDF)"]
+    SB["Anthropic sandbox<br/>(fallback PDF)"]
     KB["Managed knowledge<br/>(tutor notes)"]
     F["App files (R2)"]
   end
@@ -44,7 +45,9 @@ flowchart LR
   A -- RBAC-bypassing tools, guarded --> R
   A -- enqueueJob --> J
   J -- clustering --> AI
-  J -- practice set --> SB
+  J -- practice set --> AI
+  J -- typeset --> LX
+  J -. fallback .-> SB
   J --> F
   S -- hints --> C --> AI
   C -- search_notes --> KB
@@ -90,7 +93,8 @@ flowchart LR
 | File storage (`useR2Files`, `appFiles`) | Tutor notes uploads; practice-set PDFs in the tutor's private folder | `NotesPanel`, `practice-set` job |
 | **AI generation via the DeepSpace proxy** | Misconception clustering (`createDeepSpaceAI` + `generateText` + structured output) | `src/jobs/cluster-problem.ts` |
 | **AI chat + custom tools** (`ChatPanel`, `registerAgent`) | Read-only Socratic hint assistant with `get_current_problem` / `search_notes` | `src/ai` |
-| **Anthropic sandbox** (`codeExecutionTool`, `sandboxFiles`) | Python writes the practice-set PDF and correct-rate chart | `src/jobs/practice-set.ts` |
+| **LaTeX compiler integration** (`latex-compiler/compile` via `buildCronContext().integrations.call`) | Typesets the practice-set PDF. Claude writes the problems as structured data; mathjs writes each derivative question and works out (or checks) its answer; the server builds the `.tex` itself, with a pgfplots chart of the exact correct rates, escaped text and an allowlist of maths commands, so AI output can't run `\input` or `\write` | `src/jobs/practice-set.ts`, `src/lib/practiceLatex.ts` |
+| **Anthropic sandbox** (`codeExecutionTool`, `sandboxFiles`) | Fallback: if the LaTeX path fails, Python in the sandbox writes the PDF instead | `src/jobs/practice-set.ts` |
 | **Managed knowledge** (`knowledge(env).scoped`) | Hints grounded in the tutor's own notes, one folder per session | `src/actions/notes-actions.ts`, `src/ai/tools.ts` |
 | **Local agent tools** (`registerAgent`) | `npx deepspace agent invoke tutorpulse sessionReport` gives the tutor's own coding agent a session report (tutor-only, counts and labels only) | `src/ai/tools.ts`, `src/lib/sessionReport.ts` |
 | Multi-user testing (`users` fixture) | Tutor + 2 students in one Playwright test | `tests/` |
@@ -163,7 +167,7 @@ git commit -am "…" && npx deepspace deploy
 node scripts/seed-demo.ts         # dev-only: creates the demo session for the CLI's logged-in account
 ```
 
-No API keys live in this repo. AI, the sandbox and knowledge all go through the DeepSpace platform, billed to the app owner with per-session caps (`src/lib/limits.ts`: 30 clustering runs, 5 practice sets, 200 hint turns, 15 follow-up drafts). `.dev.vars` is generated and git-ignored.
+No API keys live in this repo. AI, the LaTeX compiler, the sandbox and knowledge all go through the DeepSpace platform, billed to the app owner with per-session caps (`src/lib/limits.ts`: 30 clustering runs, 5 practice sets, 200 hint turns, 15 follow-up drafts). `.dev.vars` is generated and git-ignored.
 
 ---
 
