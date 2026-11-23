@@ -1,18 +1,18 @@
-set: pltl-week4 · model: default (claude-haiku-5-5) · topic: math2413-w4
+set: calc1-week4 · model: default (claude-haiku-5-5)
 
 Problem 1: \frac{d}{dx}\sqrt{x^2+2}  (key x/sqrt(x^2+2))
   9 answers, 2 correct · 3 clusters vs 3 intended · agreement 1.00
   ● Forgot the 2x from inside — 3
-      Differentiated the square root as 1/(2sqrt) but left out the derivative of the inside, giving answers like 1/(2sqrt(x^2+2)). Try asking: what happens to the inside x^2+2 when you differentiate it, and does the chain rule need that factor?
+      Applied the square root rule and multiplied by nothing, e.g. wrote 1/(2sqrt(x^2+2)), skipping the inner derivative. Try asking: what is the derivative of the expression under the root, and where does it go?
       · 1/(2√(x²+2))     "d/dx sqrt(u) = 1/(2 sqrt u)"  [no-inner-derivative]
       · 1/(2*sqrt(x^2+2)) "power rule on the square root"  [no-inner-derivative]
       · 1/(2sqrt(x^2+2)) "derivative of sqrt is 1 over 2 sqrt"  [no-inner-derivative]
-  ● Took root of just 2x — 2
-      Differentiated the inside to get 2x, then treated the square root as applying only to that, giving answers like sqrt(2x) or 1/(2sqrt(2x)). Try asking: is the root taken of the derivative, or is the derivative of the whole root expression still needed?
-      · 1/(2sqrt(2x))    "derivative of x^2+2 is 2x so sqrt of that"  [differentiated-inside-in-place]
+  ● Took the root of 2x — 2
+      Differentiated the inside to get 2x, then put it under the root as sqrt(2x) or 1/(2sqrt(2x)). Try asking: if the derivative of sqrt(u) is 1/(2sqrt(u)), what should u be replaced with, and is it inside or outside the root?
       · sqrt(2x)         "differentiate inside first then take the root"  [differentiated-inside-in-place]
-  ● Dropped the 1/2 factor — 2
-      Applied the chain rule with the 2x inside, giving answers like 2x/sqrt(x^2+2), but missed the 1/2 that comes from the square root. Try asking: what is the derivative of sqrt(u) in terms of u, and where does that 1/2 go?
+      · 1/(2sqrt(2x))    "derivative of x^2+2 is 2x so sqrt of that"  [differentiated-inside-in-place]
+  ● Forgot the 1/2 from power — 2
+      Multiplied by the inner derivative 2x but dropped the 1/2 from the power rule, e.g. wrote 2x/sqrt(x^2+2). Try asking: what power is the square root, and what does the power rule say to multiply by first?
       · 2x/(sqrt(x^2+2)) "chain rule gives 2x on top"  [dropped-the-half]
       · 2x/sqrt(x^2+2)   "times the derivative of the inside"  [dropped-the-half]
 
@@ -23,31 +23,31 @@ Problem 2: \frac{d}{dx}\left[(x^2-5x)(1-3x)\right]  (key -9x^2+32x-5)
       · (2x-5)*(-3)      "derivative of a product is the product of derivatives"  [multiplied-derivatives]
       · -6x+15           "took the derivative of both and multiplied"  [multiplied-derivatives]
       · (2x-5)(-3)       "derivative of each bracket multiplied"  [multiplied-derivatives]
-  ● Made an arithmetic slip expanding — 2
-      Expanded or differentiated with a coefficient error, e.g. wrote -9x^2+28x-5 or -9x^2+30x-5, when the expansion should give -3x^3+16x^2-5x. Try asking: what do you get when you multiply x^2-5x by each term of 1-3x?
+  ● Slipped on the x-term — 2
+      Expanded correctly in principle but got the x-coefficient wrong after differentiating, e.g. -9x^2+28x-5 or -9x^2+30x-5 instead of +32x. Try asking: after expanding, what is the derivative of the 16x^2 term?
       · -9x^2+28x-5      "multiplied out then differentiated"  [expansion-slip]
       · -9x^2+30x-5      "expanded first then power rule"  [expansion-slip]
-  ● Differentiated only the first factor — 2
-      Took the derivative of the first bracket only and left the second bracket as it was, e.g. wrote (2x-5)(1-3x). Try asking: what happens to the second bracket when you differentiate it?
+  ● Differentiated only the first bracket — 2
+      Took the derivative of the first factor and left the second unchanged, giving (2x-5)(1-3x). Try asking: what happens to the (1-3x) bracket in your answer, and does it need differentiating too?
       · (2x-5)(1-3x)     "f' times g"  [half-product-rule]
       · (2x-5)(1-3x)     "product rule"  [half-product-rule]
 
 Problem 3: \frac{d}{dx}\,\frac{2x^3-5x+2\sqrt{x}}{\sqrt{x}}  (key 5x^(3/2)-5/(2*sqrt(x)))
   9 answers, 2 correct · 4 clusters vs 4 intended · agreement 1.00
-  ● Divided the two derivatives — 3
-      Differentiated top and bottom separately, then divided them, e.g. (6x^2-5+1/sqrt(x))/(1/(2sqrt(x))), instead of simplifying first. Try asking: if you divide the derivatives, do you get the derivative of a quotient, or is there a simpler route using the original expression?
+  ● Divides the two derivatives — 3
+      Differentiated top and bottom separately and divided, e.g. (6x^2-5+x^(-1/2))/(0.5x^(-1/2)), instead of simplifying first. Try asking: if you divide the derivative of top by the derivative of bottom, do you get the derivative of the whole fraction?
       · 2sqrt(x)(6x^2-5+1/sqrt(x)) "top derivative divided by bottom derivative"  [divided-derivatives]
       · (6x^2-5+x^(-1/2))/(0.5x^(-1/2)) "differentiate numerator and denominator"  [divided-derivatives]
       · (6x^2-5+1/sqrt(x))/(1/(2sqrt(x))) "derivative of top over derivative of bottom"  [divided-derivatives]
-  ● Kept the exponent after multiplying — 2
-      Multiplied by the power but did not lower it, giving answers like 5x^(5/2)-2.5sqrt(x). Try asking: when you apply the power rule to x^(5/2), what should the new exponent be?
+  ● Multiplies but keeps the power — 2
+      Brought each power down as a multiplier but never subtracted 1 from the exponent, e.g. 5x^(5/2) and 5x^(5/2)-2.5sqrt(x). Try asking: when you differentiate x^(5/2), what should the new exponent be?
       · 5x^(5/2)-2.5sqrt(x) "power rule on each term"  [exponent-not-lowered]
       · 5x^(5/2)-5/2*x^(1/2) "simplified then brought the power down"  [exponent-not-lowered]
-  ● Thinks derivative of 2 is 1 — 1
-      Simplified correctly but gave 5x^(3/2)-5/(2sqrt(x))+1, adding 1 for the constant term. Try asking: what is the derivative of a constant like 2, and why?
+  ● Thinks constant 2 becomes 1 — 1
+      Added +1 for the derivative of the constant 2, e.g. 5x^(3/2)-5/(2sqrt(x))+1. Try asking: what is the derivative of any constant, like 2 or 7?
       · 5x^(3/2)-5/(2sqrt(x))+1 "derivative of the 2 is 1"  [derivative-of-constant]
   ● Simplified but never differentiated — 1
-      Simplified the function to 2x^(5/2)-5x^(1/2)+2 and stopped without taking the derivative. Try asking: what does the question ask you to find, and what is the next step after simplifying?
+      Simplified the fraction to 2x^(5/2)-5x^(1/2)+2 and stopped without taking the derivative. Try asking: after simplifying, what operation does the question still ask you to do?
       · 2x^(5/2)-5x^(1/2)+2 "simplified by dividing each term"  [simplified-not-differentiated]
 
 mean agreement: 1.00

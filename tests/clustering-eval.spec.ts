@@ -17,13 +17,13 @@
 import { writeFileSync } from 'node:fs'
 import { test, expect, loadAllTestAccounts } from 'deepspace/testing'
 import { DEMO_PROBLEMS as CHAIN_RULE } from './fixtures/chain-rule-demo'
-import { PLTL_WEEK4_PROBLEMS } from './fixtures/pltl-week4'
+import { CALC1_WEEK4_PROBLEMS } from './fixtures/calc1-week4'
 import { WORKING_PROBLEMS, type WorkingProblem } from './fixtures/working-eval'
 import type { Page } from '@playwright/test'
 
-/** EVAL_SET=pltl-week4 evaluates real PLTL Week 4 problems; EVAL_SET=working the whiteboard set. */
+/** EVAL_SET=calc1-week4 evaluates real Calc I Week 4 study-group problems; EVAL_SET=working the whiteboard set. */
 const DEMO_PROBLEMS: WorkingProblem[] =
-  process.env.EVAL_SET === 'pltl-week4' ? PLTL_WEEK4_PROBLEMS : process.env.EVAL_SET === 'working' ? WORKING_PROBLEMS : CHAIN_RULE
+  process.env.EVAL_SET === 'calc1-week4' ? CALC1_WEEK4_PROBLEMS : process.env.EVAL_SET === 'working' ? WORKING_PROBLEMS : CHAIN_RULE
 const NO_IMAGES = process.env.EVAL_NO_IMAGES === '1'
 
 /** Render a student's working lines as an 800×600 handwriting-style PNG (base64), like a pad drawing. */

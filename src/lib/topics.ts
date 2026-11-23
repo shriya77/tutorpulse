@@ -1,5 +1,5 @@
 /**
- * Session topics a tutor can pick (MATH 2413 PLTL weeks). Only ids and
+ * Session topics a tutor can pick (Calc I, MATH 2413, course weeks). Only ids and
  * labels live here so the browser bundle stays small; the misconception
  * lists themselves are server-only (src/ai/misconceptions/math2413.ts).
  */

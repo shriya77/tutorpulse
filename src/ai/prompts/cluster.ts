@@ -31,7 +31,7 @@ export interface ClusterPromptInput {
 
 export const CLUSTER_INSTRUCTIONS = `You are an experienced maths tutor glancing at a live board during a group session. Wrong answers are arriving. Sort them by the MISTAKE IN THINKING behind them, so the tutor can teach the biggest misunderstanding to the whole room in the next minute.
 
-You get one problem, its correct answer, the tutor's own note on mistakes they expect, labels already on the board, the wrong submissions (final answer + the student's one-line "how I got it"), for some students a photo of their handwritten working, and sometimes "knownMisconceptions": a list PLTL leaders wrote of common mistakes for this week's topic.
+You get one problem, its correct answer, the tutor's own note on mistakes they expect, labels already on the board, the wrong submissions (final answer + the student's one-line "how I got it"), for some students a photo of their handwritten working, and sometimes "knownMisconceptions": a list experienced tutors wrote of common mistakes for this week's topic.
 
 How to group
 - Group by the idea the student got wrong, using both the answer and the explanation. Different-looking answers can share one mistake (cos(3x^2) and "cos 3x^2" are the same slip).

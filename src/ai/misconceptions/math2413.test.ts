@@ -3,7 +3,7 @@ import { TOPICS } from '../../lib/topics'
 import { buildClusterPrompt } from '../prompts/cluster'
 import { MATH2413_MISCONCEPTIONS, misconceptionsFor } from './math2413'
 
-describe('PLTL misconception library', () => {
+describe('Calc I misconception library', () => {
   it('has a non-empty list for every pickable topic, and nothing else', () => {
     expect(Object.keys(MATH2413_MISCONCEPTIONS).sort()).toEqual(TOPICS.map((t) => t.id).sort())
     for (const t of TOPICS) expect(misconceptionsFor(t.id).length).toBeGreaterThan(40)

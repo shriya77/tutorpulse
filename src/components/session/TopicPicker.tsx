@@ -1,6 +1,6 @@
 /**
- * Tutor picks the PLTL week a session covers. The week's misconception list
- * (written by PLTL leaders) is then given to the clustering AI so group labels
+ * Tutor picks the Calc I week a session covers. The week's misconception list
+ * (written by an experienced study-group leader) is then given to the clustering AI so group labels
  * use the same language the tutor already uses. Optional.
  */
 
@@ -17,7 +17,7 @@ export function TopicPicker({ session }: { session: Envelope<SessionData> }) {
     <div className="grid gap-1.5 rounded-2xl border border-border bg-card p-4 shadow-[0_1px_2px_0_rgba(29,43,58,0.05)]" data-testid="topic-picker">
       <Label htmlFor={`topic-${session.recordId}`}>Topic (optional)</Label>
       <p className="text-xs text-muted-foreground">
-        Pick the PLTL week and the misconception groups will use that week’s list of common mistakes.
+        Pick which week of Calc I this session covers, and the misconception groups will use that week’s list of common mistakes.
       </p>
       <Select
         value={session.data.topic || NONE}

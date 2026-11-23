@@ -23,7 +23,7 @@ export const sessionsSchema: CollectionSchema = {
       default: 'draft',
     },
     { name: 'currentProblemId', storage: 'text', interpretation: 'plain' },
-    /** Optional PLTL week (src/lib/topics.ts); its misconception list guides cluster labels. */
+    /** Optional Calc I course week (src/lib/topics.ts); its misconception list guides cluster labels. */
     { name: 'topic', storage: 'text', interpretation: 'plain' },
     /** Misconception currently "on the board"; shown as a banner to students. */
     { name: 'focusLabel', storage: 'text', interpretation: 'plain' },

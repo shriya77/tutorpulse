@@ -1,12 +1,12 @@
 /**
- * MATH 2413 PLTL misconception library (server-only).
+ * Calc I (MATH 2413) misconception library (server-only).
  *
- * Transcribed from the PLTL leader's write-up "MATH 2413 PLTL: Common
- * Misconceptions & Student Mistakes" (Shriya, from the Week 1, 3, 4, 7, 8, 9,
- * 10 and 11 packets). Each entry is the headline of one misconception, kept
- * in the leader's own wording (maths simplified to plain text). When a tutor
- * picks a week for a session, the clustering prompt receives that week's
- * list so group labels use the language PLTL leaders already use.
+ * Transcribed from Shriya's write-up "Common Misconceptions & Student
+ * Mistakes", drawn from the Week 1, 3, 4, 7, 8, 9, 10 and 11 packets of the
+ * course's peer-led study groups. Each entry is the headline of one
+ * misconception, kept in her own wording (maths simplified to plain text).
+ * When a tutor picks a week for a session, the clustering prompt receives
+ * that week's list so group labels use the language tutors already use.
  */
 
 import { isTopicId, type TopicId } from '../../lib/topics'

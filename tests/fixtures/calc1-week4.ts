@@ -1,13 +1,13 @@
 /**
- * Real problems from MATH 2413 PLTL Week 4 (problems 6c, 7e, 7c of the
- * packet), with the packet's correct answers. The packets contain no student
+ * Real problems from Week 4 of a Calc I (MATH 2413) peer-led study-group
+ * packet (problems 6c, 7e, 7c), with the packet's correct answers. The packets contain no student
  * work, so the wrong answers below are written to show the classic mistakes
  * for each problem, tagged like tests/fixtures/chain-rule-demo.ts. Used to
  * check the clustering prompt generalizes beyond the chain-rule demo.
  */
 import type { DemoProblem } from './chain-rule-demo'
 
-export const PLTL_WEEK4_PROBLEMS: DemoProblem[] = [
+export const CALC1_WEEK4_PROBLEMS: DemoProblem[] = [
   {
     prompt: '\\frac{d}{dx}\\sqrt{x^2+2}',
     answer: 'x/sqrt(x^2+2)',

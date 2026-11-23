@@ -28,7 +28,7 @@ Left out on purpose: video and messaging (tutoring already happens in the room o
 - Checked SDK calls against the installed types and proved risky paths with throwaway spikes first.
 - Built the schemas, guards, actions, jobs, prompts, UI and tests (131 unit tests, 14 browser specs including privacy tests).
 - Found security gaps beyond the spec, e.g. any member could enqueue or read jobs, and presence rooms admitted strangers.
-- Built clustering evals scored against intended groups: 0.95 → 1.00 after prompt tuning; 1.00 on real PLTL Week 4 problems; 0.92 without working images vs 1.00 with them.
+- Built clustering evals scored against intended groups: 0.95 → 1.00 after prompt tuning; 1.00 on real Calc I study-group problems; 0.92 without working images vs 1.00 with them.
 
 ## 5. What I verified, decided and changed
 
@@ -36,7 +36,7 @@ Left out on purpose: video and messaging (tutoring already happens in the room o
 - **Made the calls:** re-scaffold on the new SDK, owner-billed hints, F17, and more accounts for a realistic room.
 - **Tested it myself:** signed off Phase 0, joined a live session as a student, and ran `sessionReport` against the live app.
 - **Changed the direction:** judged that the demo depends on clustering feeling smart and pushed the work there; asked for the restyle and for em dashes to go.
-- **Brought the domain knowledge:** eight MATH 2413 PLTL packets (one worked by me) and my misconceptions write-up, which became the per-week library behind the cluster labels.
+- **Brought the domain knowledge:** eight Calc I study-group problem packets (one worked by me) and my misconceptions write-up, which became the per-week library behind the cluster labels.
 - **Had the whiteboard idea:** group students by their written working rather than a one-line reason. I then dropped the redundant explanation box.
 
 **Unfinished:** the whiteboard hasn't been tried with real students' handwriting and only answers in *x* are auto-checked; the README's limitations list has the rest. **Next:** session history and per-student trends.
