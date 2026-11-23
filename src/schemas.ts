@@ -22,6 +22,7 @@ import { followUpsSchema } from './schemas/follow-ups-schema'
 import { recapRequestsSchema } from './schemas/recap-requests-schema'
 import { displayNamesSchema } from './schemas/display-names-schema'
 import { teamMembersSchema } from './schemas/team-members-schema'
+import { digestPrefsSchema } from './schemas/digest-prefs-schema'
 
 import { aiChatSchemas } from './schemas/ai-chat-schema'
 
@@ -40,4 +41,5 @@ export const schemas: CollectionSchema[] = [
   recapRequestsSchema,
   displayNamesSchema,
   teamMembersSchema,
+  digestPrefsSchema,
 ]

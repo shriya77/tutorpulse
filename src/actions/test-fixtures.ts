@@ -1,5 +1,5 @@
 /**
- * TEST-ONLY server actions used by tests/privacy.spec.ts (T4).
+ * TEST-ONLY server actions used by tests/privacy.spec.ts (T4) and tests/digest.spec.ts.
  *
  * They seed rows that clients can never write themselves (submissions,
  * clusters, practice sets) so the privacy test can check what each user is
@@ -21,6 +21,7 @@ import { checkAnswer } from '../lib/answerCheck'
 import { MAX_WORK_BYTES } from '../lib/limits'
 import { isPngBytes, workRelativeKey } from '../lib/work'
 import { requestClustering } from './clustering-trigger'
+import { runWeeklyDigest } from '../cron'
 import type { Envelope, ProblemData } from './types'
 
 const TEST_TITLE_PREFIX = '__test-'
@@ -143,7 +144,21 @@ const clusterEval: ActionHandler<Env> = async ({ userId, params, tools, env }) =
   return { success: true, data: { sessionId, problemIds: problemIds.join(',') } }
 }
 
+/** Run the weekly digest task now, for the calling test account only (tests/digest.spec.ts). */
+const runWeeklyDigestForMe: ActionHandler<Env> = async (ctx) => {
+  if (!(await isTestUser(ctx.tools, ctx.userId))) return { success: false, error: 'Test accounts only' }
+  if (ctx.params.resetPreviewOnly === true) {
+    const rows = await ctx.tools.query('digestPrefs', { where: { userId: ctx.userId }, limit: 1 })
+    const row = rows.success ? rows.data.records[0] : undefined
+    if (row) await ctx.tools.update('digestPrefs', row.recordId, { lastPreviewAt: '' })
+    return { success: true, data: { reset: true } }
+  }
+  const tally = await runWeeklyDigest(ctx.env, { onlyUserId: ctx.userId, ignoreLastSent: true })
+  return { success: true, data: { tally } }
+}
+
 export const testActions: Record<string, ActionHandler<Env>> = {
   testSeedPrivacyFixture: seedPrivacyFixture,
+  testRunWeeklyDigest: runWeeklyDigestForMe,
   testClusterEval: clusterEval,
 }
