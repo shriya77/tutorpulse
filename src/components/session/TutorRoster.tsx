@@ -10,10 +10,12 @@ import { useMemo } from 'react'
 import { usePresenceRoom, useUserLookup } from 'deepspace'
 import type { Envelope, ProblemData, SessionData } from '../../actions/types'
 import type { StudentPresence } from './StudentView'
+import { useSessionDisplayNames } from '../../hooks/useDisplayName'
 
 export function TutorRoster({ session, problems }: { session: Envelope<SessionData>; problems: Envelope<ProblemData>[] }) {
   const { peers, connected } = usePresenceRoom(`session:${session.recordId}`)
   const { getName } = useUserLookup()
+  const displayNames = useSessionDisplayNames(session.recordId, Array.isArray(session.data.participantIds) ? session.data.participantIds : [])
   const problemNumber = useMemo(() => new Map(problems.map((p, i) => [p.recordId, i + 1])), [problems])
 
   const rows = useMemo(() => {
@@ -25,7 +27,7 @@ export function TutorRoster({ session, problems }: { session: Envelope<SessionDa
         const state = (peer?.state ?? {}) as Partial<StudentPresence>
         return {
           id,
-          name: peer?.userName || getName(id) || 'Student',
+          name: displayNames[id] || peer?.userName || getName(id) || 'Student',
           online: !!peer,
           problem: state.problemId ? problemNumber.get(state.problemId) : undefined,
           submitted: !!state.submitted,
@@ -33,7 +35,7 @@ export function TutorRoster({ session, problems }: { session: Envelope<SessionDa
         }
       })
       .sort((a, b) => Number(b.stuck) - Number(a.stuck) || Number(b.online) - Number(a.online) || a.name.localeCompare(b.name))
-  }, [peers, session.data.participantIds, getName, problemNumber])
+  }, [peers, session.data.participantIds, getName, problemNumber, displayNames])
 
   const stuckCount = rows.filter((r) => r.stuck).length
 

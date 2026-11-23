@@ -9,6 +9,7 @@
  */
 import type { ActionHandler } from 'deepspace/worker'
 import type { Env } from '../../worker'
+import { displayNamesFor } from './profile-actions'
 import { buildHistory, type HistoryInput } from '../lib/history'
 import { listTutorSessions } from './guards'
 import type { ClusterData, Envelope, SubmissionData } from './types'
@@ -47,12 +48,6 @@ export const tutorHistory: ActionHandler<Env> = async (ctx) => {
   const ids = new Set<string>()
   for (const s of input.sessions) for (const p of s.participantIds) ids.add(p)
   for (const x of input.submissions) ids.add(x.studentId)
-  await Promise.all(
-    [...ids].slice(0, MAX_NAMES).map(async (id) => {
-      const u = await ctx.tools.get<{ name?: string }>('users', id)
-      const name = u.success ? u.data.record.data.name : undefined
-      if (typeof name === 'string' && name.trim()) input.names[id] = name.trim().slice(0, 80)
-    }),
-  )
+  Object.assign(input.names, await displayNamesFor(ctx.tools, [...ids].slice(0, MAX_NAMES)))
   return { success: true, data: buildHistory(input) }
 }

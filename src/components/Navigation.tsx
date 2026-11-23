@@ -27,6 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui'
+import { useMyDisplayName } from '../hooks/useDisplayName'
 
 export default function Navigation() {
   const { isLoaded, isSignedIn, user, userLoading } = useAuthProfileReady({ requireUser: true })
@@ -100,14 +101,14 @@ export default function Navigation() {
                     <Avatar className="h-6 w-6 ring-1 ring-inset ring-border">
                       <AvatarImage src={user.imageUrl ?? undefined} referrerPolicy="no-referrer" />
                       <AvatarFallback className="text-[11px]">
-                        {(user.name?.[0] ?? user.email?.[0] ?? '?').toUpperCase()}
+                        <DisplayName fallback={user.name || user.email || '?'} initial />
                       </AvatarFallback>
                     </Avatar>
                     <span
                       data-testid="nav-user-name"
                       className="hidden max-w-[140px] truncate text-foreground sm:inline"
                     >
-                      {user.name || user.email}
+                      <DisplayName fallback={user.name || user.email || ''} />
                     </span>
                     <ChevronDown
                       className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-150 group-data-[popup-open]:rotate-180"
@@ -119,7 +120,7 @@ export default function Navigation() {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>
                   <div className="truncate font-medium text-foreground">
-                    {user.name || 'Signed in'}
+                    <DisplayName fallback={user.name || 'Signed in'} />
                   </div>
                   <div
                     data-testid="nav-user-email"
@@ -165,4 +166,10 @@ export default function Navigation() {
       {showAuthModal && <AuthOverlay onClose={() => setShowAuthModal(false)} />}
     </>
   )
+}
+
+/** The user's TutorPulse display name, else `fallback`. Mounted only when signed in. */
+function DisplayName({ fallback, initial = false }: { fallback: string; initial?: boolean }) {
+  const name = useMyDisplayName() || fallback
+  return <>{initial ? (name[0] ?? '?').toUpperCase() : name}</>
 }

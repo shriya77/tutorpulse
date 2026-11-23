@@ -18,6 +18,7 @@ import { OTHER_LABEL } from '../lib/clusters'
 import { MAX_RECAP_EMAILS_PER_SEND } from '../lib/limits'
 import { buildRecapEmail, type RecapProblem } from '../lib/recapEmail'
 import { requireParticipant, requireTutor } from './guards'
+import { displayNamesFor } from './profile-actions'
 import type { ClusterData, Envelope, ProblemData, RecapRequestData, SubmissionData } from './types'
 
 /** Student opts in (or out) of a recap email for this session. */
@@ -89,7 +90,7 @@ export const sendRecaps: ActionHandler<Env> = async (ctx) => {
     const subs = await ctx.tools.query<SubmissionData>('submissions', { where: { sessionId: session.recordId, studentId: r.data.studentId }, limit: 100 })
     const mine = subs.success ? (subs.data.records as Envelope<SubmissionData>[]) : []
     const mail = buildRecapEmail({
-      studentName: (user.success && user.data.record.data.name) || '',
+      studentName: (await displayNamesFor(ctx.tools, [r.data.studentId]))[r.data.studentId] ?? '',
       sessionTitle: session.data.title,
       sessionUrl,
       problems: studentResults(problems, mine, clusters),

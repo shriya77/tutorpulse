@@ -15,7 +15,7 @@ describe('collection schemas', () => {
     expect(schema.permissions['*']).toEqual({ read: false, create: false, update: false, delete: false })
   })
 
-  it.each(['submissions', 'clusters', 'practiceSets', 'followUps', 'recapRequests'])('%s is never client-writable', (name) => {
+  it.each(['submissions', 'clusters', 'practiceSets', 'followUps', 'recapRequests', 'displayNames'])('%s is never client-writable', (name) => {
     const schema = schemas.find((s) => s.name === name)!
     for (const [role, perms] of Object.entries(schema.permissions)) {
       if (role === 'admin') continue
