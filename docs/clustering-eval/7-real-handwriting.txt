@@ -1,0 +1,25 @@
+Real-handwriting trial (docs/HANDWRITING_TRIAL.md), run by Shriya on the live app, 2026-11-23.
+Board screenshot: 7-real-handwriting-board.png
+
+Problem: d/dx (2x+1)/(x-3), key -7/(x-3)^2. No expected mistakes given (the AI got no help).
+Two students, SAME wrong final answer 7/(x-3)^2, no typed explanation:
+  A  phone, finger on the sketch pad: (2x+1)(1) - (x-3)(2) over (x-3)^2  (top terms in the wrong order)
+  B  paper, photo upload:              2(x-3) - (2x+1) = -7, then drops the minus ("squared, so positive")
+
+With the typed answer alone these two are indistinguishable, so they would be one group.
+
+Result on the tutor's board: TWO groups, 1 student each.
+  "Swapped the quotient rule order"
+     Wrote (2x+1)(1) minus (x-3)(2) over (x-3)^2, so the order of the quotient rule is reversed,
+     giving 7/(x-3)^2 instead of -7/(x-3)^2.
+  "Thinks squaring makes it positive"
+     One student's working correctly gets 2(x-3)-(2x+1) = -7, then drops the minus sign because
+     the denominator is squared, giving 7/(x-3)^2.
+
+Verdict: PASS (by the trial's own criteria: two groups, each naming the right mistake, and each
+explanation quotes a step that appears only in that student's working: the finger-written pad for A,
+the paper photo for B).
+
+Caveats: one run with two students, written by one person who knew the intended mistakes, so the
+writing was probably neater than a rushed student's. Not a benchmark; it shows real handwriting,
+on the pad and in a photo, is read well enough to separate two mistakes with the same answer.

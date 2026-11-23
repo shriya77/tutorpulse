@@ -1,5 +1,7 @@
 # Real-handwriting trial (about 10 minutes, needs you)
 
+> **Done 2026-11-23: PASS.** Two groups, each naming the right mistake from the working. Result in `docs/clustering-eval/7-real-handwriting.txt`.
+
 Every whiteboard result so far used typed text in a handwriting font. This checks what the AI makes of **real** handwriting, on the pad and on paper. It spends 2–3 small AI calls.
 
 ## Setup (laptop)

@@ -197,6 +197,7 @@ Students can write their steps on a sketch pad under each problem (finger, stylu
 - **Tutor view.** Each group's "Show answers" includes the working as a thumbnail; tap to enlarge.
 - **Photos of paper.** Most students work on paper, so "Use a photo of paper instead" takes a picture. The phone shrinks it and re-encodes it as JPEG, which drops the EXIF block (camera details and **GPS location**). The server accepts only a PNG drawing or an EXIF-free JPEG, so a raw phone photo uploaded some other way is refused rather than passing a location on to the tutor (`tests/work-photo.spec.ts`).
 - **Does it help?** On a set built the way real rooms look (vague notes; one wrong answer, 7/(x−3)², reached by two different mistakes), agreement with the intended groups was **0.92 without the images and 1.00 with them** (`docs/clustering-eval/5-…`, `6-…`; one run each, so treat it as a sign, not a benchmark). The eval images are typed text in a handwriting font (`docs/clustering-eval/sample-working.png`), not real handwriting.
+- **Real handwriting.** In a live trial (`docs/HANDWRITING_TRIAL.md`), two students gave the same wrong answer, 7/(x−3)², and no typed reason: one wrote the working with a finger on the phone pad (quotient-rule terms swapped), the other photographed paper (dropped the minus because the bottom is squared). The board split them into **two correct groups**, "Swapped the quotient rule order" and "Thinks squaring makes it positive", each explanation quoting a step that appears only in that student's working (`docs/clustering-eval/7-real-handwriting.txt`, screenshot alongside). One run, one writer who knew the mistakes, so a good sign rather than proof.
 
 ## Follow-up checks, answer kinds, recap emails, history
 
@@ -212,5 +213,5 @@ Students can write their steps on a sketch pad under each problem (finger, stylu
 - Joining is a read-modify-write on a JSON list, retried until the student is present. A burst of simultaneous joins is very unlikely to lose one, but it isn't impossible.
 - If tutor notes contain worked solutions, the hint assistant could quote them (the upload panel warns).
 - `problems` are readable by every signed-in user (prompts aren't secret); private problem banks would need a per-session room.
-- The whiteboard and photos haven't been tried with real students' handwriting yet; messy writing will be harder to read than the eval images. Only the newest 12 images per run are sent to the AI. A follow-up check whose key isn't a derivative relies on the tutor reviewing the AI's key.
+- Real handwriting has been tried once (two students, one writer; see the whiteboard section); rushed, messy writing from a full room is still untested. Only the newest 12 images per run are sent to the AI. A follow-up check whose key isn't a derivative relies on the tutor reviewing the AI's key.
 - Next: a weekly misconception digest, LMS export, and history trends per topic rather than per session.
