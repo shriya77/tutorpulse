@@ -54,7 +54,7 @@ flowchart LR
 
 **Why it's shaped this way**
 - **AI never grades.** `src/lib/answerCheck.ts` compares answers numerically at 5 sample points (1e-6 tolerance), parsing student text against an allowlist. Only *wrong* answers go to the AI, which keeps the counts trustworthy and the cost low.
-- **Privacy is enforced in the data layer, not the UI.** Every collection has row-level rules. `submissions` and `clusters` can only be written by server code. The answer key has its own tutor-only collection, because DeepSpace can't hide a single field.
+- **Privacy is enforced in the data layer, not the UI.** Every collection has row-level rules. `submissions`, `clusters` and `followUps` can only be written by server code. The answer key has its own tutor-only collection, because DeepSpace can't hide a single field.
 - **Server code is the trust boundary.** Actions and jobs bypass RBAC, so every action starts with `requireTutor` / `requireParticipant` (`src/actions/guards.ts`) and scopes every query to what that guard returned.
 - **Clustering is debounced:** at most one job per problem is in flight, and new answers mark it "dirty" so it runs once more. Output is validated with zod (each wrong answer exactly once, labels ≤ 6 words), retried once with the reason, and falls back to grouping identical answers.
 
@@ -62,14 +62,14 @@ flowchart LR
 
 | Path | What's there |
 | --- | --- |
-| `src/schemas/` | 8 app collections + permissions (`permissions.ts` holds the shared deny/admin baselines) |
+| `src/schemas/` | 9 app collections (incl. `followUps`) + permissions (`permissions.ts` holds the shared deny/admin baselines) |
 | `src/actions/` | Server actions, `guards.ts`, the debounced clustering trigger, test-only fixtures |
 | `src/jobs.ts`, `src/jobs/` | Background jobs: `cluster-problem`, `practice-set` |
-| `src/ai/prompts/` | The three prompts (clustering, hints, practice set), kept separate so they're easy to read and tune |
+| `src/ai/prompts/` | The four prompts (clustering, hints, practice set, follow-up check), kept separate so they're easy to read and tune |
 | `src/ai/tools.ts`, `src/ai/chat-routes.ts` | Hint assistant tools and chat route (session gate, cap, owner billing) |
-| `src/lib/` | Pure logic with unit tests: answer checking, cluster validation, join codes, limits |
+| `src/lib/` | Pure logic with unit tests: answer checking, cluster validation, history, working images, join codes, limits |
 | `src/server/` | Worker routes: actions, members-only presence, practice-set download, owner record helpers |
-| `src/components/session/`, `src/pages/` | Tutor setup/board, student view, roster, notes, hints, practice set, QR |
+| `src/components/session/`, `src/pages/` | Tutor setup/board, student view, sketch pad, roster, notes, hints, practice set, QR, history |
 | `tests/` | Playwright E2E (multi-user) + specs that run against the live app |
 
 ---
@@ -123,9 +123,11 @@ npx deepspace dev start           # local dev server (Vite + Workers runtime)
 **Tests**
 
 ```bash
-npm run test:unit                 # 100+ Vitest tests: answer checking (T6), cluster validation (T7), guards, schemas
+npm run test:unit                 # ~150 Vitest tests: answer checking (T6), cluster validation (T7), guards, schemas
 npx deepspace test run all        # Playwright, local: T1–T5, T8 (working privacy), walkthrough, phone layout
 RUN_AI_TESTS=1 npx deepspace test run tests/whiteboard.spec.ts   # pad → tutor thumbnail, one small AI call
+RUN_AI_TESTS=1 npx deepspace test run tests/follow-up.spec.ts    # follow-up check, two small AI calls
+RUN_AI_TESTS=1 npx deepspace test run tests/work-photo.spec.ts   # photo of paper working, one small AI call
 RUN_AI_EVAL=1 EVAL_SET=working [EVAL_NO_IMAGES=1] npx deepspace test run tests/clustering-eval.spec.ts
 ```
 
@@ -146,6 +148,11 @@ Test-account emails are global across all DeepSpace developers, so add a unique 
 | `tests/mobile.spec.ts` | Every main screen at 390 px with no horizontal overflow |
 | `tests/phase3.spec.ts` | Roster + stuck, drill-in, take to board, notes, hints (T9), practice-set PDF (T10). **AI-billed:** `RUN_AI_TESTS=1` |
 | `tests/clustering-eval.spec.ts` | Prints real clustering output for the 3 demo problems. **AI-billed:** `RUN_AI_EVAL=1` |
+| `tests/work-privacy.spec.ts` | **T8**: working images reach only the student and their tutor; borrowed keys and non-images refused |
+| `tests/follow-up.spec.ts` | Follow-up check reaches only the misconception group; others can't see or answer it. **AI-billed** |
+| `tests/work-photo.spec.ts` | Photo working: EXIF (incl. GPS) stripped on the phone, a raw EXIF photo refused, the AI reads it |
+| `tests/answer-kinds.spec.ts` | Number lists, intervals, DNE and an expression in t, marked correct through `submitAnswer` |
+| `tests/history.spec.ts` | Tutor history across sessions; a student gets none of it; no emails in the response |
 
 Run any spec against the deployed app with `npx playwright test -c tests/playwright.live.config.ts tests/<spec>`. The test-only seed actions used by T4 and the eval exist only when `ALLOW_DEBUG_ROUTES=true` (local), and only for `@deepspace.test` accounts.
 
@@ -156,7 +163,7 @@ git commit -am "…" && npx deepspace deploy
 node scripts/seed-demo.ts         # dev-only: creates the demo session for the CLI's logged-in account
 ```
 
-No API keys live in this repo. AI, the sandbox and knowledge all go through the DeepSpace platform, billed to the app owner with per-session caps (`src/lib/limits.ts`: 30 clustering runs, 5 practice sets, 200 hint turns). `.dev.vars` is generated and git-ignored.
+No API keys live in this repo. AI, the sandbox and knowledge all go through the DeepSpace platform, billed to the app owner with per-session caps (`src/lib/limits.ts`: 30 clustering runs, 5 practice sets, 200 hint turns, 15 follow-up drafts). `.dev.vars` is generated and git-ignored.
 
 ---
 
@@ -181,14 +188,21 @@ Students can write their steps on a sketch pad under each problem (finger, stylu
 - **Storage and privacy.** The pad exports an 800 px PNG into the student's **private** folder (`useR2Files`, scope `self`, one key per problem, so revisions replace it). `submitAnswer` re-reads that key from the caller's own folder and checks it is a small PNG before storing `submissions.workKey`, so a student can't attach anyone else's file. The image leaves the folder only through `GET /api/submissions/:id/work`, which answers the student who wrote it and the session's tutor (404 for everyone else). Covered by `tests/work-privacy.spec.ts` (T8).
 - **Clustering.** The job attaches up to 12 working images (newest first) labelled with their submission ids, and the prompt tells Claude to group by the first step where the working goes wrong.
 - **Tutor view.** Each group's "Show answers" includes the working as a thumbnail; tap to enlarge.
+- **Photos of paper.** Most students work on paper, so "Use a photo of paper instead" takes a picture. The phone shrinks it and re-encodes it as JPEG, which drops the EXIF block (camera details and **GPS location**). The server accepts only a PNG drawing or an EXIF-free JPEG, so a raw phone photo uploaded some other way is refused rather than passing a location on to the tutor (`tests/work-photo.spec.ts`).
 - **Does it help?** On a set built the way real rooms look (vague notes; one wrong answer, 7/(x−3)², reached by two different mistakes), agreement with the intended groups was **0.92 without the images and 1.00 with them** (`docs/clustering-eval/5-…`, `6-…`; one run each, so treat it as a sign, not a benchmark). The eval images are typed text in a handwriting font (`docs/clustering-eval/sample-working.png`), not real handwriting.
+
+## Follow-up checks, answer kinds, history
+
+- **"Check it landed."** Students re-answering the same problem right after the explanation is weak evidence. From any misconception group, the tutor can have the AI draft one fresh problem aimed at the same mistake, review it, and send it to that group only. For derivative questions the AI only suggests the function; mathjs writes the prompt and differentiates it for the key, so the key is exact ("worked out by maths"); anything else is marked for the tutor to check. It becomes a normal tutor-owned problem plus one server-written `followUps` row per student, readable by that student and the tutor only, so nobody learns who else was in the group; `submitAnswer` refuses it from anyone else. The board shows "2 of 3 now get it right".
+- **More kinds of answers.** The key's form picks the comparison: expressions in x, t or θ; numbers (`x = -1, 3`, any order, `±2`); intervals (`(-inf, 2) U (3, inf)` or `x < 2 or x > 3`); limits (`DNE`, `inf`). Writing this found and fixed an allowlist gap: names used as function arguments (`sin(y)`) skipped the check.
+- **History** (`/history`, linked from home). Each student's correct rate session by session and the misconceptions that came back across sessions, plus a summary of every session. It names students, so it is a tutor-only page, never the projected board; `tutorHistory` reads only sessions the caller ran and returns display names only.
 
 ## Known limitations / next steps
 
-- Answers are checked only when they're expressions in **x**; anything else is "needs review" and goes to clustering as raw text.
+- Answers are checked automatically when they're an expression (in x, t or θ), a list of numbers, intervals, or DNE/∞. Anything else (points, words, multi-variable answers) is "needs review" and goes to clustering as raw text.
 - Clustering tends to be fine-grained with few answers. The prompt (`src/ai/prompts/cluster.ts`) is the place to tune it.
 - Joining is a read-modify-write on a JSON list, retried until the student is present. A burst of simultaneous joins is very unlikely to lose one, but it isn't impossible.
 - If tutor notes contain worked solutions, the hint assistant could quote them (the upload panel warns).
 - `problems` are readable by every signed-in user (prompts aren't secret); private problem banks would need a per-session room.
-- The whiteboard hasn't been tried with real students' handwriting yet; messy writing will be harder to read than the eval images. Only the newest 12 drawings per run are sent to the AI.
-- Next: session history and per-student trends, photo uploads of paper working, a weekly misconception digest, LMS export.
+- The whiteboard and photos haven't been tried with real students' handwriting yet; messy writing will be harder to read than the eval images. Only the newest 12 images per run are sent to the AI. A follow-up check whose key isn't a derivative relies on the tutor reviewing the AI's key.
+- Next: a weekly misconception digest, LMS export, and history trends per topic rather than per session.
