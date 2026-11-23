@@ -244,7 +244,7 @@ function AnswerCard({
           Write your steps here, or take a photo of your paper. Only your tutor sees them, and it helps them spot where things went off track.
         </p>
         {usePad ? (
-          <WorkPad ref={pad} baseUrl={savedIsPhoto ? null : savedWorkUrl} disabled={locked || busy} onDirtyChange={setPadDirty} onInkChange={setPadInk} />
+          <WorkPad ref={pad} baseUrl={savedIsPhoto ? null : savedWorkUrl} disabled={locked || busy} onDirtyChange={setPadDirty} onInkChange={setPadInk} fullScreenHeading={<MathText source={prompt} display />} />
         ) : (
           photoUrl && (
             <div className="overflow-hidden rounded-xl border border-input bg-white">
