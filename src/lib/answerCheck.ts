@@ -365,6 +365,68 @@ export function keyKind(key: string): AnswerKind | null {
   return parseSafe(key) ? 'expression' : null
 }
 
+// ── Display ─────────────────────────────────────────────────────────────────
+
+const VAR_TEX: Record<string, string> = { x: 'x', t: 't', theta: '\\theta', 'θ': '\\theta' }
+
+/** One number or endpoint as TeX: `inf` → ∞, `sqrt(2)` → √2. Falls back to the text as typed. */
+function valueTex(raw: string): string {
+  const v = raw.trim()
+  const sp = special(v)
+  if (sp === 'inf') return '\\infty'
+  if (sp === '-inf') return '-\\infty'
+  return expressionTex(v) ?? `\\text{${v.replace(/[\\{}$&#^_%~]/g, '')}}`
+}
+
+const OP_TEX: Record<string, string> = { '<': '<', '<=': '\\le', '>': '>', '>=': '\\ge' }
+
+/**
+ * How the tutor's key reads as maths, for the problem editor:
+ * `6x*cos(3x^2)` → 6x cos(3x²), `(-inf, 2) U (3, inf)` → (−∞, 2) ∪ (3, ∞),
+ * `x = -1, 3` → x = −1, 3, `DNE` → DNE. Null if the key can't be checked.
+ * Keeps the tutor's own structure (order, brackets, √2 rather than 1.414).
+ */
+export function keyTex(raw: string): string | null {
+  if (typeof raw !== 'string') return null
+  const kind = keyKind(raw)
+  if (!kind) return null
+  if (kind === 'expression') return expressionTex(raw)
+  if (kind === 'limit') {
+    const sp = special(raw)
+    return sp === 'dne' ? '\\text{DNE}' : sp === 'inf' ? '\\infty' : '-\\infty'
+  }
+  const s = raw.replace(/[−–—]/g, '-').replace(/∞/g, 'inf').replace(/infinity/gi, 'inf').replace(/≤/g, '<=').replace(/≥/g, '>=').trim()
+  if (kind === 'numbers') {
+    const inner = s.replace(/^\{(.*)\}$/, '$1')
+    let variable = ''
+    const parts = inner.split(/,|;|\bor\b|\band\b/i).map((p) => p.trim()).filter(Boolean).map((p) => {
+      const named = p.match(/^(x|t|θ|theta)\s*=\s*(.+)$/i)
+      if (named) {
+        variable = VAR_TEX[named[1].toLowerCase()] ?? 'x'
+        p = named[2]
+      }
+      const pm = p.match(/^(±|\+-|\+\/-)\s*(.+)$/)
+      return pm ? `\\pm ${valueTex(pm[2])}` : valueTex(p)
+    })
+    return `${variable ? `${variable} = ` : ''}${parts.join(',\\ ')}`
+  }
+  // Intervals: bracket pieces joined by ∪, inequality pieces by "or".
+  const pieces = s.replace(/^(x|t|θ|theta)\s*(∈|in)\s*/i, '').split(/∪|\bU\b|\bu\b|\bor\b/i).map((p) => p.trim())
+  const out = pieces.map((p) => {
+    const br = p.match(/^([[(])(.*)([\])])$/)
+    if (br) {
+      const [lo, hi] = splitTop(br[2])
+      return `\\left${br[1]} ${valueTex(lo)}, ${valueTex(hi)} \\right${br[3]}`
+    }
+    const both = p.match(/^(.+?)\s*(<=|<)\s*(x|t|theta|θ)\s*(<=|<)\s*(.+)$/i)
+    if (both) return `${valueTex(both[1])} ${OP_TEX[both[2]]} ${VAR_TEX[both[3].toLowerCase()]} ${OP_TEX[both[4]]} ${valueTex(both[5])}`
+    const one = p.match(/^(x|t|theta|θ)\s*(<=|<|>=|>)\s*(.+)$/i)
+    if (one) return `${VAR_TEX[one[1].toLowerCase()]} ${OP_TEX[one[2]]} ${valueTex(one[3])}`
+    return `\\text{${p.replace(/[\\{}$&#^_%~]/g, '')}}`
+  })
+  return out.join(/^[[(]/.test(pieces[0] ?? '') ? ' \\cup ' : ' \\ \\text{or}\\ ')
+}
+
 const same = (a: number, b: number) => (a === b ? true : Number.isFinite(a) && Number.isFinite(b) && close(a, b))
 
 /** Compare a student's answer with the key, in the form the key is written in. Never throws. */

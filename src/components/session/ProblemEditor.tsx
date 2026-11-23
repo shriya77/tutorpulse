@@ -12,24 +12,40 @@ import { MathText } from '../MathText'
 
 type KeyMap = Map<string, Envelope<AnswerKeyData>>
 
-/** Loads the answer checker lazily (mathjs is large) to warn about keys it can't grade. */
-function useKeyWarning(answer: string): string | null {
-  const [warning, setWarning] = useState<string | null>(null)
+/**
+ * Loads the answer checker lazily (mathjs is large) to show how a key reads as
+ * maths, or warn that it can't be graded.
+ */
+function useKeyInfo(answer: string): { tex: string | null; warning: string | null } {
+  const [info, setInfo] = useState<{ tex: string | null; warning: string | null }>({ tex: null, warning: null })
   useEffect(() => {
     let live = true
     const text = answer.trim()
     if (!text) {
-      setWarning(null)
+      setInfo({ tex: null, warning: null })
       return
     }
-    void import('../../lib/answerCheck').then(({ keyKind }) => {
-      if (live) setWarning(keyKind(text) ? null : 'This can’t be checked automatically, so every answer will be marked "needs review".')
+    void import('../../lib/answerCheck').then(({ keyKind, keyTex }) => {
+      if (!live) return
+      const ok = !!keyKind(text)
+      setInfo({ tex: ok ? keyTex(text) : null, warning: ok ? null : 'This can’t be checked automatically, so every answer will be marked "needs review".' })
     })
     return () => {
       live = false
     }
   }, [answer])
-  return warning
+  return info
+}
+
+/** The saved key as maths (the text as typed is in the tooltip), or as typed if it can't be read. */
+function KeyMath({ answer }: { answer: string }) {
+  const { tex } = useKeyInfo(answer)
+  if (!tex) return <code className="font-mono text-foreground">{answer}</code>
+  return (
+    <span className="text-foreground" title={`Typed as ${answer}`} data-testid="answer-key-math">
+      <MathText source={tex} />
+    </span>
+  )
 }
 
 export function ProblemEditor({ sessionId, problems, keys }: { sessionId: string; problems: Envelope<ProblemData>[]; keys: KeyMap }) {
@@ -66,7 +82,7 @@ function ProblemFields({
   answer: string; setAnswer: (v: string) => void
   mistakes: string; setMistakes: (v: string) => void
 }) {
-  const warning = useKeyWarning(answer)
+  const { tex, warning } = useKeyInfo(answer)
   return (
     <div className="grid gap-3">
       <div className="grid gap-1.5">
@@ -84,6 +100,11 @@ function ProblemFields({
           An expression in x, t or θ (<code>6x*cos(3x^2)</code>), numbers (<code>x = -1, 3</code>), intervals (<code>(-inf, 2) U (3, inf)</code>) or a limit (<code>DNE</code>, <code>inf</code>).
         </p>
         <Input id={`${idPrefix}-answer`} value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="6x*cos(3x^2)" className="font-mono" />
+        {tex && (
+          <p className="text-sm text-muted-foreground" data-testid="answer-preview">
+            Reads as: <span className="text-foreground"><MathText source={tex} /></span>
+          </p>
+        )}
         {warning && <p className="rounded-md border border-warning/50 bg-warning/15 px-2 py-1 text-xs text-foreground">{warning}</p>}
       </div>
       <div className="grid gap-1.5">
@@ -164,7 +185,7 @@ function ProblemRow({
         <div className="space-y-2">
           <div className="text-lg text-foreground"><MathText source={problem.data.prompt} display /></div>
           <p className="text-sm text-muted-foreground">
-            Answer: <code className="font-mono text-foreground">{answerKey?.data.answer ?? 'missing, add one'}</code>
+            Answer: {answerKey ? <KeyMath answer={answerKey.data.answer} /> : <span className="text-foreground">missing, add one</span>}
           </p>
         </div>
       )}
