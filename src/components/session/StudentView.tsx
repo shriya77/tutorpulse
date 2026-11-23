@@ -254,7 +254,10 @@ function AnswerCard({
         )}
         <div className="flex flex-wrap items-center gap-2">
           {usePad ? (
-            <label className={`inline-flex cursor-pointer items-center rounded-lg border border-input px-3 py-1.5 text-sm text-foreground hover:bg-secondary ${locked || busy ? 'pointer-events-none opacity-50' : ''}`}>
+            // `relative` keeps the visually hidden input inside this label. Without it the
+            // input is positioned against <body>, far below the screen, and opening the
+            // file chooser scrolled the page to it, leaving a blank strip on laptops.
+            <label className={`relative inline-flex cursor-pointer items-center rounded-lg border border-input px-3 py-1.5 text-sm text-foreground hover:bg-secondary ${locked || busy ? 'pointer-events-none opacity-50' : ''}`}>
               Use a photo of paper instead
               <input
                 type="file"

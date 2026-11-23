@@ -62,7 +62,19 @@ test('a photo of paper working reaches the tutor without its EXIF', async ({ use
 
     await page.goto(`/sessions/${sessionId}`)
     await expect(page.getByTestId('work-canvas')).toBeVisible({ timeout: 20_000 })
-    await page.getByTestId('work-photo-input').setInputFiles({ name: 'IMG_0001.jpg', mimeType: 'image/jpeg', buffer: raw })
+    // Pick the file the way a laptop user does (click → file chooser).
+    await page.setViewportSize({ width: 1000, height: 600 }) // a laptop window, where the button sits low on screen
+    await page.getByText('Use a photo of paper instead').scrollIntoViewIfNeeded()
+    // Only the app's <main> scrolls; the page itself must not be scrollable. The hidden
+    // file input used to sit outside <main> (positioned against <body>), which made the
+    // whole page scrollable, so opening the file chooser shifted the app up and left a
+    // blank strip on laptops until the upload finished.
+    const pageOverflow = () => page.evaluate(() => document.documentElement.scrollHeight - document.documentElement.clientHeight)
+    console.log('[photo] page overflow px:', await pageOverflow())
+    expect(await pageOverflow()).toBeLessThanOrEqual(0)
+    const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.getByText('Use a photo of paper instead').click()])
+    expect(await page.evaluate(() => document.documentElement.scrollTop)).toBe(0)
+    await chooser.setFiles({ name: 'IMG_0001.jpg', mimeType: 'image/jpeg', buffer: raw })
     await expect(page.getByTestId('work-photo')).toBeVisible()
     await expect(page.getByTestId('work-canvas')).toHaveCount(0)
     await expect(page.getByTestId('explanation-input')).toHaveCount(0)
