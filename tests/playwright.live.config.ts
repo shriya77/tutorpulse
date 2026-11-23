@@ -6,9 +6,8 @@ import { chromiumLaunchOptions } from 'deepspace/testing'
  *   npx playwright test -c tests/playwright.live.config.ts tests/core-loop.spec.ts
  * AI-billed specs (phase3, notes-pdf) also need RUN_AI_TESTS=1.
  * Test-only fixture actions are disabled in production, so specs that need
- * them (privacy, clustering-eval) only run locally; core-loop's cleanup
- * step is a no-op here and leaves one "__test-…" session owned by the
- * test tutor account.
+ * them (privacy, clustering-eval, digest) only run locally. Cleanup uses
+ * `cleanupTestSession`, which works here too, so live runs leave nothing behind.
  */
 export default defineConfig({
   testDir: '.',

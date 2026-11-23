@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useState, type FormEvent } from 'react'
-import { signOut, useUser } from 'deepspace'
+import { signOut, useQuery, useUser } from 'deepspace'
 import { Button, Input, Label } from '@/components/ui'
 import { useMyDisplayName } from '../../../hooks/useDisplayName'
 import { callAction } from '../../../lib/callAction'
@@ -102,6 +102,7 @@ export default function SettingsPage() {
           </Button>
         </section>
 
+        <WeeklyDigest />
         <Appearance />
       </div>
     </div>
@@ -144,6 +145,76 @@ function Appearance() {
         ))}
       </div>
       <p className="text-xs text-muted-foreground">Saved on this device. The sketch pad stays light paper either way, so your working looks the same to your tutor.</p>
+    </section>
+  )
+}
+
+const OUTCOME_TEXT: Record<string, string> = {
+  sent: 'Sent. Check your inbox (and spam, the first time).',
+  test_account: 'Built, but not sent: this is a test account.',
+  empty: 'Nothing to send: you haven’t run a session in the past 7 days.',
+  no_email: 'Your account has no email address to send to.',
+  failed: 'The email couldn’t be sent. Try again later.',
+}
+
+/** Tutor's weekly summary email: off unless turned on here. */
+function WeeklyDigest() {
+  const { records, status } = useQuery<{ weekly: number; lastSentAt?: string }>('digestPrefs')
+  const saved = records[0]?.data.weekly === 1
+  const [optimistic, setOptimistic] = useState<boolean | null>(null)
+  const [busy, setBusy] = useState<null | 'toggle' | 'preview'>(null)
+  const [note, setNote] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
+  const on = optimistic ?? saved
+
+  async function toggle(next: boolean) {
+    setOptimistic(next)
+    setBusy('toggle')
+    setNote(null)
+    const r = await callAction('setWeeklyDigest', { weekly: next })
+    setBusy(null)
+    if (!r.ok) {
+      setOptimistic(null)
+      setNote({ kind: 'error', text: r.error })
+    }
+  }
+  async function preview() {
+    setBusy('preview')
+    setNote(null)
+    const r = await callAction<{ outcome: string }>('sendDigestPreview', {})
+    setBusy(null)
+    setNote(r.ok ? { kind: r.data.outcome === 'sent' ? 'ok' : 'error', text: OUTCOME_TEXT[r.data.outcome] ?? r.data.outcome } : { kind: 'error', text: r.error })
+  }
+
+  return (
+    <section className="mt-6 space-y-3 rounded-lg border border-border bg-card p-6" aria-labelledby="digest-title">
+      <h2 id="digest-title" className="text-lg font-semibold">Weekly summary email</h2>
+      <label className="flex cursor-pointer items-start gap-2 text-sm text-foreground">
+        <input
+          type="checkbox"
+          className="mt-0.5 h-4 w-4 accent-primary"
+          checked={on}
+          disabled={status === 'loading' || busy !== null}
+          onChange={(e) => toggle(e.target.checked)}
+          data-testid="digest-toggle"
+        />
+        <span>
+          Email me a summary of my sessions every Monday morning
+          <span className="block text-xs text-muted-foreground">
+            For tutors: the week’s sessions, the most common misconceptions, and students whose mistake came back. It names your students, so it only goes to you. Nothing is sent in a week with no sessions.
+          </span>
+        </span>
+      </label>
+      {records[0]?.data.lastSentAt && (
+        <p className="text-xs text-muted-foreground" data-testid="digest-last">Last sent {new Date(records[0].data.lastSentAt).toLocaleDateString()}.</p>
+      )}
+      <Button variant="outline" size="sm" onClick={preview} disabled={busy !== null} data-testid="digest-preview">
+        {busy === 'preview' ? 'Sending…' : 'Email me a preview now'}
+      </Button>
+      {note && (
+        <p role={note.kind === 'error' ? 'alert' : 'status'} className={`text-sm ${note.kind === 'ok' ? 'text-success' : 'text-muted-foreground'}`} data-testid="digest-note">
+          {note.text}
+        </p>
+      )}
     </section>
   )
 }
