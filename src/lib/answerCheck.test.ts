@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkAnswer, normalizeExpression, parseSafe, derivativeProblem } from './answerCheck'
+import { checkAnswer, derivativeProblem, keyKind, normalizeExpression, parseSafe } from './answerCheck'
 
 /** T6 — answer equivalence. */
 describe('checkAnswer (T6)', () => {
@@ -112,5 +112,70 @@ describe('derivativeProblem (follow-up checks)', () => {
     expect(derivativeProblem('import("fs")')).toBeNull()
     expect(derivativeProblem('5')).toBeNull()
     expect(derivativeProblem('')).toBeNull()
+  })
+})
+
+describe('other answer kinds', () => {
+  const v = (student: string, key: string) => checkAnswer(student, key).verdict
+
+  it('lists of numbers, in any order and any common notation', () => {
+    expect(keyKind('x = -1, 3')).toBe('numbers')
+    for (const s of ['x = 3, x = -1', '{-1, 3}', 'x=-1 or x=3', '3,-1', 'x = −1, 3']) expect(v(s, 'x = -1, 3')).toBe('correct')
+    expect(v('x = -1', 'x = -1, 3')).toBe('incorrect')
+    expect(v('x = 1, 3', 'x = -1, 3')).toBe('incorrect')
+    expect(v('±2', 'x = -2, 2')).toBe('correct')
+    expect(v('x = sqrt(2), -sqrt(2)', '±sqrt(2)')).toBe('correct')
+  })
+
+  it('a single-number key accepts "x = 2"', () => {
+    expect(v('x = 2', '2')).toBe('correct')
+    expect(v('x = 3', '2')).toBe('incorrect')
+    expect(v('pi/4', 'x = pi/4')).toBe('correct')
+  })
+
+  it('intervals and inequalities', () => {
+    const key = '(-inf, 2) U (3, inf)'
+    expect(keyKind(key)).toBe('intervals')
+    for (const s of ['(-∞, 2) ∪ (3, ∞)', 'x < 2 or x > 3', '(3, infinity) U (-infinity, 2)']) expect(v(s, key)).toBe('correct')
+    expect(v('(-inf, 2] U (3, inf)', key)).toBe('incorrect')
+    expect(v('(-inf, 2)', key)).toBe('incorrect')
+    expect(v('[1, 4)', '[1, 4)')).toBe('correct')
+    expect(v('1 <= x < 4', '[1, 4)')).toBe('correct')
+    expect(v('(1, 4)', '[1, 4)')).toBe('incorrect')
+    expect(v('x >= 0', '[0, inf)')).toBe('correct')
+    expect(v('x = 2', '(-inf, 2)')).toBe('incorrect')
+    expect(v('increasing on the left', '(-inf, 2)')).toBe('needs_review')
+  })
+
+  it('limits that are DNE or infinite', () => {
+    expect(keyKind('DNE')).toBe('limit')
+    expect(v('does not exist', 'DNE')).toBe('correct')
+    expect(v("doesn't exist", 'DNE')).toBe('correct')
+    expect(v('0', 'DNE')).toBe('incorrect')
+    expect(v('∞', 'inf')).toBe('correct')
+    expect(v('-infinity', 'inf')).toBe('incorrect')
+    expect(v('DNE', '3')).toBe('incorrect')
+  })
+
+  it('expressions in t or theta, with the letter checked', () => {
+    expect(v('6t*cos(3t^2)', '6t*cos(3t^2)')).toBe('correct')
+    expect(v('2θ', '2theta')).toBe('correct')
+    expect(v('6x*cos(3x^2)', '6t*cos(3t^2)')).toBe('needs_review')
+    expect(v('tan(t)', 'tan(t)')).toBe('correct')
+    expect(keyKind('6x*cos(3x^2)')).toBe('expression')
+    expect(keyKind('see notes')).toBeNull()
+  })
+
+  it('existing expression keys behave as before', () => {
+    expect(v('(x+1)^2', 'x^2+2x+1')).toBe('correct')
+    expect(keyKind('(x+1)^2')).toBe('expression')
+  })
+})
+
+describe('allowlist covers function arguments', () => {
+  it('rejects unknown names inside a function call', () => {
+    expect(parseSafe('sin(y)')).toBeNull()
+    expect(parseSafe('cos(import)')).toBeNull()
+    expect(parseSafe('sin(x)')).not.toBeNull()
   })
 })

@@ -22,8 +22,8 @@ function useKeyWarning(answer: string): string | null {
       setWarning(null)
       return
     }
-    void import('../../lib/answerCheck').then(({ parseSafe }) => {
-      if (live) setWarning(parseSafe(text) ? null : 'Not an expression in x that can be checked automatically; every answer will be marked "needs review".')
+    void import('../../lib/answerCheck').then(({ keyKind }) => {
+      if (live) setWarning(keyKind(text) ? null : 'This can’t be checked automatically, so every answer will be marked "needs review".')
     })
     return () => {
       live = false
@@ -79,7 +79,10 @@ function ProblemFields({
         )}
       </div>
       <div className="grid gap-1.5">
-        <Label htmlFor={`${idPrefix}-answer`}>Correct answer (expression in x; only you can see this)</Label>
+        <Label htmlFor={`${idPrefix}-answer`}>Correct answer (only you can see this)</Label>
+        <p className="-mt-1 text-xs text-muted-foreground">
+          An expression in x, t or θ (<code>6x*cos(3x^2)</code>), numbers (<code>x = -1, 3</code>), intervals (<code>(-inf, 2) U (3, inf)</code>) or a limit (<code>DNE</code>, <code>inf</code>).
+        </p>
         <Input id={`${idPrefix}-answer`} value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="6x*cos(3x^2)" className="font-mono" />
         {warning && <p className="rounded-md border border-warning/50 bg-warning/15 px-2 py-1 text-xs text-foreground">{warning}</p>}
       </div>

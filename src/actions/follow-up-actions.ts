@@ -18,7 +18,7 @@ import { createDeepSpaceAI } from 'deepspace/worker'
 import type { ActionContext, ActionHandler } from 'deepspace/worker'
 import type { Env } from '../../worker'
 import { buildFollowUpPrompt, FOLLOW_UP_INSTRUCTIONS, followUpOutputSchema } from '../ai/prompts/follow-up'
-import { derivativeProblem, parseSafe } from '../lib/answerCheck'
+import { derivativeProblem, keyKind } from '../lib/answerCheck'
 import { MAX_FOLLOWUP_DRAFTS_PER_SESSION } from '../lib/limits'
 import { CLUSTER_MODEL } from '../jobs/cluster-problem'
 import { loadSessionProblem, requireTutor, SESSION_NOT_FOUND } from './guards'
@@ -98,7 +98,7 @@ export const draftFollowUp: ActionHandler<Env> = async (ctx) => {
     const built = derivativeProblem(out.functionToDifferentiate)
     if (built) return { success: true, data: { ...built, verified: true, students } }
   }
-  if (out.prompt && out.answer && parseSafe(out.answer)) {
+  if (out.prompt && out.answer && keyKind(out.answer)) {
     return { success: true, data: { prompt: out.prompt.slice(0, MAX_PROMPT), answer: out.answer, verified: false, students } }
   }
   return { success: false, error: 'Could not write a follow-up, try again' }
@@ -108,7 +108,7 @@ export const sendFollowUp: ActionHandler<Env> = async (ctx) => {
   const prompt = typeof ctx.params.prompt === 'string' ? ctx.params.prompt.trim() : ''
   const answer = typeof ctx.params.answer === 'string' ? ctx.params.answer.trim() : ''
   if (!prompt || prompt.length > MAX_PROMPT) return { success: false, error: 'Write the problem (under 500 characters)' }
-  if (!parseSafe(answer)) return { success: false, error: 'The answer must be an expression in x' }
+  if (!keyKind(answer)) return { success: false, error: 'The answer key must be something the app can check (an expression, numbers, intervals or a limit)' }
   const g = await loadGroup(ctx)
   if (!g.ok) return { success: false, error: g.error }
   if (g.studentIds.length === 0) return { success: false, error: 'Nobody is in this group any more' }

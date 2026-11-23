@@ -6,8 +6,12 @@
  * `6x*cos(3x^2)`, `cos(3x²)·6x` and `6x cos(3x^2)` are all correct for the
  * key `6x*cos(3x^2)`, while `cos(3x^2)` is not.
  *
+ * The key's form picks the comparison: an expression in x, t or θ (sampled
+ * as above), a list of numbers (`x = -1, 3`, any order), a union of intervals
+ * (`(-inf, 2) U (3, inf)`, or inequalities), or a limit (`DNE`, `inf`).
+ *
  * Input that cannot be parsed safely (prose, unknown functions, anything
- * that is not a plain expression in x) is `needs_review`: it is kept, sent to
+ * that fits none of those forms) is `needs_review`: it is kept, sent to
  * clustering with its raw text, and never marked correct.
  *
  * Safety: student text is untrusted. It is parsed (never `evaluate`d as a
@@ -43,7 +47,9 @@ const ALLOWED_FUNCTIONS = new Set([
   'sinh', 'cosh', 'tanh',
   'exp', 'log', 'ln', 'log10', 'sqrt', 'cbrt', 'abs',
 ])
-const ALLOWED_SYMBOLS = new Set(['x', 'pi', 'e'])
+/** Variables an answer may use (one per answer), plus the constants pi and e. */
+const VARIABLES = ['x', 't', 'theta'] as const
+const ALLOWED_SYMBOLS = new Set<string>([...VARIABLES, 'pi', 'e'])
 const ALLOWED_NODE_TYPES = new Set([
   'ConstantNode', 'SymbolNode', 'OperatorNode', 'ParenthesisNode', 'FunctionNode',
 ])
@@ -72,6 +78,7 @@ export function normalizeExpression(raw: string): string {
     .replace(/[·×∙⋅]/g, '*')
     .replace(/[−–—]/g, '-')
     .replace(/π/g, 'pi')
+    .replace(/θ/g, 'theta')
     .replace(/\*\*/g, '^')
     .replace(/\{/g, '(')
     .replace(/\}/g, ')')
@@ -80,7 +87,7 @@ export function normalizeExpression(raw: string): string {
   }
   s = s.replace(/[A-Za-z]+/g, (run) => splitLetters(run) ?? run)
   // A variable/constant directly before "(" means multiply: `x(x^2+2)` is x·(x²+2), not a call.
-  s = s.replace(/(?<![A-Za-z])(x|e|pi)\s*\(/g, '$1*(')
+  s = s.replace(/(?<![A-Za-z])(x|t|theta|e|pi)\s*\(/g, '$1*(')
   // A number or closing paren directly before a function name: `2cos(x)`, `(x)sin(x)`.
   s = s.replace(new RegExp(`([0-9)])\\s*(${FUNCTION_NAMES})\\s*\\(`, 'g'), '$1*$2(')
   return s.trim()
@@ -118,7 +125,8 @@ export function parseSafe(raw: string): MathNode | null {
       const fn = (n as unknown as { fn: MathNode & { name?: string } }).fn
       if (fn.type !== 'SymbolNode' || !ALLOWED_FUNCTIONS.has(fn.name ?? '')) safe = false
     } else if (n.type === 'SymbolNode') {
-      const isFunctionName = parent?.type === 'FunctionNode'
+      // Exempt only the function's own name (sin in sin(y)), not its arguments (y).
+      const isFunctionName = parent?.type === 'FunctionNode' && (parent as unknown as { fn: MathNode }).fn === n
       const name = (n as unknown as { name: string }).name
       if (!isFunctionName && !ALLOWED_SYMBOLS.has(name)) safe = false
     } else if (n.type === 'ConstantNode') {
@@ -140,9 +148,9 @@ function mulberry32(seed: number): () => number {
   }
 }
 
-function evaluateAt(compiled: ReturnType<MathNode['compile']>, x: number): number | null {
+function evaluateAt(compiled: ReturnType<MathNode['compile']>, value: number, variable = 'x'): number | null {
   try {
-    const v: unknown = compiled.evaluate({ x, ln: Math.log })
+    const v: unknown = compiled.evaluate({ [variable]: value, ln: Math.log })
     return typeof v === 'number' && Number.isFinite(v) ? v : null
   } catch {
     return null
@@ -153,12 +161,28 @@ function close(a: number, b: number): boolean {
   return Math.abs(a - b) <= TOLERANCE * Math.max(1, Math.abs(a), Math.abs(b))
 }
 
-/** Compare a student's answer with the key. Never throws. */
-export function checkAnswer(studentRaw: string, keyRaw: string, seed = 20261121): CheckResult {
+/** The variables (x, t, theta) an expression uses. */
+function variablesIn(node: MathNode): Set<string> {
+  const found = new Set<string>()
+  node.traverse((n, _p, parent) => {
+    const name = (n as unknown as { name?: string }).name
+    const isFunctionName = parent?.type === 'FunctionNode' && (parent as unknown as { fn: MathNode }).fn === n
+    if (n.type === 'SymbolNode' && !isFunctionName && name && (VARIABLES as readonly string[]).includes(name)) found.add(name)
+  })
+  return found
+}
+
+/** Expression answers: equal to the key at 5 sample values of its variable (x, t or theta). */
+function checkExpression(studentRaw: string, keyRaw: string, seed: number): CheckResult {
   const keyNode = parseSafe(keyRaw)
   if (!keyNode) return { verdict: 'needs_review', reason: 'key_unparsable' }
   const studentNode = parseSafe(studentRaw)
   if (!studentNode) return { verdict: 'needs_review', reason: 'answer_unparsable' }
+  const keyVars = variablesIn(keyNode)
+  if (keyVars.size > 1) return { verdict: 'needs_review', reason: 'key_has_several_variables' }
+  const variable = [...keyVars][0] ?? 'x'
+  // Right maths in the wrong letter (x for t) is for the tutor to judge.
+  if ([...variablesIn(studentNode)].some((v) => v !== variable)) return { verdict: 'needs_review', reason: 'different_variable' }
 
   const key = keyNode.compile()
   const student = studentNode.compile()
@@ -167,9 +191,9 @@ export function checkAnswer(studentRaw: string, keyRaw: string, seed = 20261121)
   let compared = 0
   for (let attempt = 0; attempt < 40 && compared < SAMPLE_COUNT; attempt++) {
     const x = SAMPLE_MIN + random() * (SAMPLE_MAX - SAMPLE_MIN)
-    const expected = evaluateAt(key, x)
+    const expected = evaluateAt(key, x, variable)
     if (expected === null) continue // key undefined here (e.g. tan near pi/2): pick another point
-    const actual = evaluateAt(student, x)
+    const actual = evaluateAt(student, x, variable)
     if (actual === null || !close(actual, expected)) return { verdict: 'incorrect' }
     compared++
   }
@@ -195,4 +219,176 @@ export function derivativeProblem(fnRaw: string): { prompt: string; answer: stri
   } catch {
     return null
   }
+}
+
+
+// ── Other answer kinds ──────────────────────────────────────────────────────
+// The KEY's form decides how an answer is compared, so a tutor just writes the
+// key the natural way: "x = -1, 3", "(-inf, 2) U (3, inf)", "DNE", "inf".
+
+export type AnswerKind = 'expression' | 'numbers' | 'intervals' | 'limit'
+
+const SPECIAL: Record<string, 'dne' | 'inf' | '-inf'> = {
+  dne: 'dne', doesnotexist: 'dne', doesntexist: 'dne', undefined: 'dne', nolimit: 'dne',
+  inf: 'inf', '+inf': 'inf', infinity: 'inf', '+infinity': 'inf', positiveinfinity: 'inf', '∞': 'inf', '+∞': 'inf',
+  '-inf': '-inf', '-infinity': '-inf', negativeinfinity: '-inf', '-∞': '-inf',
+}
+
+function special(raw: string): 'dne' | 'inf' | '-inf' | null {
+  const s = raw.toLowerCase().replace(/^\s*(the\s+)?limit\s*(is|=)?/, '').replace(/[\s'’.]/g, '').replace(/[−–—]/g, '-')
+  return SPECIAL[s] ?? null
+}
+
+/** A constant (no variable) like `-1`, `sqrt(2)`, `pi/4`, or ±inf. */
+function constantValue(raw: string): number | null {
+  const sp = special(raw)
+  if (sp === 'inf') return Infinity
+  if (sp === '-inf') return -Infinity
+  if (sp) return null
+  const node = parseSafe(raw)
+  if (!node || variablesIn(node).size > 0) return null
+  try {
+    const v: unknown = node.compile().evaluate({ ln: Math.log })
+    return typeof v === 'number' && Number.isFinite(v) ? v : null
+  } catch {
+    return null
+  }
+}
+
+/** `x = -1, 3`, `{-1, 3}`, `x=-1 or x=3`, `±2`: a set of numbers, any order. Null if not that form. */
+export function parseNumberList(raw: string): number[] | null {
+  if (typeof raw !== 'string' || raw.length > MAX_INPUT_LENGTH) return null
+  const s = raw.replace(/[−–—]/g, '-').replace(/^\s*\{(.*)\}\s*$/, '$1')
+  const parts = s.split(/,|;|\bor\b|\band\b/i).map((p) => p.replace(/^\s*(x|t|θ|theta)\s*=\s*/i, '').trim()).filter(Boolean)
+  if (parts.length === 0) return null
+  const values: number[] = []
+  for (const part of parts) {
+    const pm = part.match(/^(±|\+-|\+\/-)\s*(.+)$/)
+    if (pm) {
+      const v = constantValue(pm[2])
+      if (v === null || !Number.isFinite(v)) return null
+      values.push(v, -v)
+      continue
+    }
+    const v = constantValue(part)
+    if (v === null || !Number.isFinite(v)) return null
+    values.push(v)
+  }
+  return values.sort((a, b) => a - b)
+}
+
+type Interval = { lo: number; hi: number; loClosed: boolean; hiClosed: boolean }
+
+/** Split on top-level commas inside one bracket pair. */
+function splitTop(inner: string): string[] {
+  const out: string[] = []
+  let depth = 0
+  let cur = ''
+  for (const ch of inner) {
+    if (ch === '(' || ch === '[') depth++
+    if (ch === ')' || ch === ']') depth--
+    if (ch === ',' && depth === 0) {
+      out.push(cur)
+      cur = ''
+    } else cur += ch
+  }
+  out.push(cur)
+  return out
+}
+
+/** One piece: `(a, b]` or an inequality `x < 2`, `x >= -1`, `-1 < x <= 4`. */
+function parseIntervalPiece(piece: string): Interval | null {
+  const p = piece.trim()
+  const br = p.match(/^([[(])(.*)([\])])$/)
+  if (br) {
+    const parts = splitTop(br[2])
+    if (parts.length !== 2) return null
+    const lo = constantValue(parts[0])
+    const hi = constantValue(parts[1])
+    if (lo === null || hi === null || lo > hi) return null
+    return { lo, hi, loClosed: br[1] === '[' && Number.isFinite(lo), hiClosed: br[3] === ']' && Number.isFinite(hi) }
+  }
+  const ineq = p.replace(/≤/g, '<=').replace(/≥/g, '>=')
+  const both = ineq.match(/^(.+?)\s*(<=|<)\s*(?:x|t|theta|θ)\s*(<=|<)\s*(.+)$/i)
+  if (both) {
+    const lo = constantValue(both[1])
+    const hi = constantValue(both[4])
+    if (lo === null || hi === null || lo > hi) return null
+    return { lo, hi, loClosed: both[2] === '<=', hiClosed: both[3] === '<=' }
+  }
+  const one = ineq.match(/^(?:x|t|theta|θ)\s*(<=|<|>=|>)\s*(.+)$/i)
+  if (one) {
+    const v = constantValue(one[2])
+    if (v === null || !Number.isFinite(v)) return null
+    const closed = one[1].endsWith('=')
+    return one[1].startsWith('<')
+      ? { lo: -Infinity, hi: v, loClosed: false, hiClosed: closed }
+      : { lo: v, hi: Infinity, loClosed: closed, hiClosed: false }
+  }
+  return null
+}
+
+/** `(-inf, 2) U (3, inf)`, `[1, 4)`, `x < 2 or x > 3`: a union of intervals. Null if not that form. */
+export function parseIntervals(raw: string): Interval[] | null {
+  if (typeof raw !== 'string' || raw.length > MAX_INPUT_LENGTH) return null
+  const s = raw.replace(/[−–—]/g, '-').replace(/∞/g, 'inf').replace(/infinity/gi, 'inf').replace(/^\s*(x|t|θ|theta)\s*(∈|in)\s*/i, '')
+  const pieces = s.split(/∪|\bU\b|\bu\b|\bor\b/i)
+  const out: Interval[] = []
+  for (const piece of pieces) {
+    const iv = parseIntervalPiece(piece)
+    if (!iv) return null
+    out.push(iv)
+  }
+  return out.sort((a, b) => a.lo - b.lo || a.hi - b.hi)
+}
+
+/** How a key will be checked, or null if it can't be checked automatically. */
+export function keyKind(key: string): AnswerKind | null {
+  if (special(key)) return 'limit'
+  if (/[[(]/.test(key.trim()[0] ?? '') && parseIntervals(key)) return 'intervals'
+  if (/[<>≤≥]/.test(key) && parseIntervals(key)) return 'intervals'
+  if (/,|;|±|\bor\b|\{/.test(key) && parseNumberList(key)) return 'numbers'
+  return parseSafe(key) ? 'expression' : null
+}
+
+const same = (a: number, b: number) => (a === b ? true : Number.isFinite(a) && Number.isFinite(b) && close(a, b))
+
+/** Compare a student's answer with the key, in the form the key is written in. Never throws. */
+export function checkAnswer(studentRaw: string, keyRaw: string, seed = 20261121): CheckResult {
+  if (typeof studentRaw !== 'string' || typeof keyRaw !== 'string') return { verdict: 'needs_review', reason: 'answer_unparsable' }
+  const kind = keyKind(keyRaw)
+  if (kind === 'limit') {
+    const want = special(keyRaw)
+    const got = special(studentRaw)
+    if (got) return { verdict: got === want ? 'correct' : 'incorrect' }
+    return parseSafe(studentRaw) || parseIntervals(studentRaw) ? { verdict: 'incorrect' } : { verdict: 'needs_review', reason: 'answer_unparsable' }
+  }
+  if (kind === 'intervals') {
+    const want = parseIntervals(keyRaw)!
+    const got = parseIntervals(studentRaw)
+    if (!got) return parseNumberList(studentRaw) || special(studentRaw) ? { verdict: 'incorrect' } : { verdict: 'needs_review', reason: 'answer_unparsable' }
+    const ok =
+      got.length === want.length &&
+      got.every((g, i) => same(g.lo, want[i].lo) && same(g.hi, want[i].hi) && g.loClosed === want[i].loClosed && g.hiClosed === want[i].hiClosed)
+    return { verdict: ok ? 'correct' : 'incorrect' }
+  }
+  if (kind === 'numbers') {
+    const want = parseNumberList(keyRaw)!
+    const got = parseNumberList(studentRaw)
+    if (!got) return parseIntervals(studentRaw) || special(studentRaw) ? { verdict: 'incorrect' } : { verdict: 'needs_review', reason: 'answer_unparsable' }
+    const ok = got.length === want.length && got.every((g, i) => same(g, want[i]))
+    return { verdict: ok ? 'correct' : 'incorrect' }
+  }
+  // A single-number key also accepts the answer written as a one-item list ("x = 2").
+  if (kind === 'expression') {
+    const res = checkExpression(studentRaw, keyRaw, seed)
+    if (res.verdict === 'needs_review' && res.reason === 'answer_unparsable' && special(studentRaw)) return { verdict: 'incorrect' }
+    if (res.verdict === 'needs_review' && res.reason === 'answer_unparsable') {
+      const k = constantValue(keyRaw)
+      const list = k !== null ? parseNumberList(studentRaw) : null
+      if (list) return { verdict: list.length === 1 && same(list[0], k!) ? 'correct' : 'incorrect' }
+    }
+    return res
+  }
+  return { verdict: 'needs_review', reason: 'key_unparsable' }
 }

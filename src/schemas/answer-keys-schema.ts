@@ -11,7 +11,7 @@ export const answerKeysSchema: CollectionSchema = {
   name: 'answerKeys',
   columns: [
     { name: 'problemId', storage: 'text', interpretation: 'plain', required: true, immutable: true },
-    /** A mathjs-parsable expression in x, e.g. `6x*cos(3x^2)`. */
+    /** The answer in a form src/lib/answerCheck can compare: `6x*cos(3x^2)`, `x = -1, 3`, `(-inf, 2) U (3, inf)`, `DNE`. */
     { name: 'answer', storage: 'text', interpretation: 'plain', required: true },
     /** Optional tutor note on mistakes they expect; fed to the clustering prompt. */
     { name: 'expectedMistakes', storage: 'text', interpretation: 'plain' },
