@@ -18,6 +18,7 @@ export type SessionData = {
   hintTurns?: number
   followUpDrafts?: number
   archived?: number
+  removedIds?: string[]
 }
 
 export type ProblemData = {

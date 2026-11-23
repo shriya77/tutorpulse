@@ -34,6 +34,8 @@ export const sessionsSchema: CollectionSchema = {
     { name: 'hintTurns', storage: 'number', interpretation: 'plain', default: 0 },
     /** Server-only: AI follow-up drafts used (cap in src/lib/limits.ts). */
     { name: 'followUpDrafts', storage: 'number', interpretation: 'plain', default: 0 },
+    /** Server-only (set by `removeStudent`): students the tutor removed; the join code no longer lets them in. */
+    { name: 'removedIds', storage: 'text', interpretation: { kind: 'json' }, default: [] },
     /** 1 = the tutor archived it: tucked away under "Archived" on their home page. Only changes the tutor's own list. */
     { name: 'archived', storage: 'number', interpretation: { kind: 'boolean' }, default: 0 },
   ],

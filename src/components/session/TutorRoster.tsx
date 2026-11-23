@@ -6,7 +6,9 @@
  * Status is spelled out in text, not colour alone.
  */
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { X } from 'lucide-react'
+import { callAction } from '../../lib/callAction'
 import { usePresenceRoom, useUserLookup } from 'deepspace'
 import type { Envelope, ProblemData, SessionData } from '../../actions/types'
 import type { StudentPresence } from './StudentView'
@@ -73,11 +75,37 @@ export function TutorRoster({ session, problems }: { session: Envelope<SessionDa
                   </span>
                 )}
                 {!r.online && <span>offline</span>}
+                <RemoveStudent sessionId={session.recordId} studentId={r.id} name={r.name} />
               </span>
             </li>
           ))}
         </ul>
       )}
     </section>
+  )
+}
+
+/** Take a student out of the session (and its board). They can't rejoin with the code. */
+function RemoveStudent({ sessionId, studentId, name }: { sessionId: string; studentId: string; name: string }) {
+  const [busy, setBusy] = useState(false)
+  async function remove() {
+    if (!window.confirm(`Remove ${name} from this session? Their answers here are deleted and the join code won't let them back in.`)) return
+    setBusy(true)
+    const r = await callAction('removeStudent', { sessionId, studentId })
+    setBusy(false)
+    if (!r.ok) window.alert(r.error)
+  }
+  return (
+    <button
+      type="button"
+      onClick={remove}
+      disabled={busy}
+      className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+      aria-label={`Remove ${name} from the session`}
+      title="Remove from session"
+      data-testid="roster-remove"
+    >
+      <X className="size-4" aria-hidden />
+    </button>
   )
 }

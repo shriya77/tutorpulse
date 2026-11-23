@@ -17,6 +17,7 @@ import { myResults, sendRecaps, setRecapEmail } from './recap-actions'
 import { sessionDisplayNames, setDisplayName } from './profile-actions'
 import { cleanupTestSession, deleteSession } from './delete-session'
 import { duplicateSession } from './duplicate-session'
+import { removeStudent } from './remove-student'
 
 export const actions: Record<string, ActionHandler<Env>> = {
   openSession,
@@ -38,5 +39,6 @@ export const actions: Record<string, ActionHandler<Env>> = {
   sessionDisplayNames,
   deleteSession,
   duplicateSession,
+  removeStudent,
   cleanupTestSession,
 }

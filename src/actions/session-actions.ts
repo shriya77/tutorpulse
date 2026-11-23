@@ -109,6 +109,9 @@ export const joinSession: ActionHandler<Env> = async (ctx) => {
     if (!fresh.success) return { success: false, error: NO_SESSION }
     const data = fresh.data.record.data as SessionData
     if (data.status !== 'open') return { success: false, error: NO_SESSION }
+    if (Array.isArray(data.removedIds) && data.removedIds.includes(ctx.userId)) {
+      return { success: false, error: 'Your tutor removed you from this session' }
+    }
     const current = Array.isArray(data.participantIds) ? data.participantIds : []
     if (current.includes(ctx.userId)) {
       return { success: true, data: { sessionId: session.recordId, role: 'student' } }
