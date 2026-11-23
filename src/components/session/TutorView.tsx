@@ -422,7 +422,7 @@ function WorkThumb({ submissionId, revision }: { submissionId: string; revision:
       className="mt-1 block cursor-zoom-in rounded-lg border border-border bg-white focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
       data-testid="work-thumb"
     >
-      <img src={url} alt="Student's handwritten working" className={big ? 'w-full max-w-2xl rounded-lg' : 'h-24 w-auto rounded-lg'} />
+      <img src={url} alt="Student's handwritten working" className={big ? 'max-h-[80vh] w-auto max-w-full rounded-lg' : 'h-24 w-32 rounded-lg object-cover object-top'} />
     </button>
   )
 }

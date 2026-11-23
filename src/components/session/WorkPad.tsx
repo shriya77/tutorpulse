@@ -2,18 +2,21 @@
  * Sketch pad for a student's handwritten working. Plain <canvas> with
  * pointer events, so a finger, stylus or mouse all work; no extra packages.
  *
- * Strokes are stored in "page" coordinates relative to the pad's width, so
- * the drawing survives a resize, a rotation, zooming and full screen, and is
- * redrawn on every change. `exportPng()` renders the whole page onto white at
- * a fixed 800 px width, whatever the zoom: small enough to upload quickly and
- * to send to the clustering model.
+ * The working lives on a "page" one unit wide and `pageH` units tall. It
+ * starts 4:3 and grows downwards: writing near the bottom adds room, and so
+ * does zooming out (you see more paper). Strokes are stored in page units, so
+ * the drawing survives resizing, rotation, zoom and full screen. The canvas
+ * only shows a window onto the page (`View`). `exportPng()` renders the used
+ * part of the page onto white at 800 px wide, whatever the zoom.
  *
  * Comfort features:
- * - Zoom (+/−, pinch, ctrl/⌘ + scroll) and moving around a zoomed page (Move
- *   tool, two fingers, scroll). Writing zoomed in gives finer strokes.
- * - Full screen: the pad covers the page, so nothing else can be touched.
+ * - Zoom 50 to 400% (+/−, pinch, ctrl/⌘ + scroll); move with two fingers,
+ *   scroll, or the Move tool. Two fingers only zoom once they clearly spread
+ *   or pinch, so a two-finger drag is a clean move.
+ * - Full screen: the pad fills the screen under the question and toolbar, so
+ *   nothing else on the page can be touched.
  * - A stroke never selects page text, and once a stylus is used, finger and
- *   palm touches only move the page instead of drawing (palm rejection).
+ *   palm touches only move the page (palm rejection).
  *
  * The drawing is private to the student and their tutor (see
  * src/server/work-routes.ts); nothing here is shared live with the room.
@@ -21,28 +24,35 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Eraser, Hand, Maximize2, Minimize2, Pen, Trash2, Undo2, ZoomIn, ZoomOut } from 'lucide-react'
+import { ArrowDownToLine, Eraser, Hand, Maximize2, Minimize2, Pen, Trash2, Undo2, ZoomIn, ZoomOut } from 'lucide-react'
 import { Button } from '@/components/ui'
 
-/** Height as a fraction of width (4:3 leaves room for several lines on a phone). */
+/** The inline pad's shape (height / width), and the page's starting height. */
 const ASPECT = 0.75
+/** The page can grow to this many widths tall (2400 px when exported). */
+export const MAX_PAGE_H = 3
+/** How much room "More space" or writing near the bottom adds. */
+const GROW = 0.375
 const EXPORT_WIDTH = 800
 const PEN_WIDTH = 0.006
 const ERASER_WIDTH = 0.045
 const INK = '#1d2b3a'
-const ZOOM_STEPS = [1, 1.5, 2, 3, 4]
-const MAX_ZOOM = ZOOM_STEPS[ZOOM_STEPS.length - 1]
-/** Grid cell of the `paper-grid` background, in CSS px at 100%. */
-const GRID = 32
+export const MIN_ZOOM = 0.5
+export const MAX_ZOOM = 4
+const ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2, 3, 4]
+/** Grid cells across the page width. */
+const GRID_CELLS = 24
+/** Two fingers must change their distance by this much before they zoom. */
+const PINCH_DEADZONE = 0.12
 
 type Point = { x: number; y: number }
 type Tool = 'pen' | 'eraser' | 'hand'
 type Op = { kind: 'stroke'; tool: 'pen' | 'eraser'; points: Point[] } | { kind: 'clear' }
-/** What part of the page is on screen: `zoom`, and the top-left corner in page units. */
+/** The window onto the page: `zoom` (1 = page width fills the pad) and its top-left corner in page units. */
 export type View = { zoom: number; x: number; y: number }
 type Gesture =
   | { kind: 'pan'; id: number; startX: number; startY: number; view: View }
-  | { kind: 'pinch'; dist: number; midX: number; midY: number; view: View }
+  | { kind: 'pinch'; dist: number; midX: number; midY: number; view: View; zooming: boolean }
 
 export interface WorkPadHandle {
   /** True once the student has drawn, erased, undone or cleared since the last save. */
@@ -66,21 +76,38 @@ interface Props {
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
-/** Keep the zoom in range and the visible window inside the page. */
-export function clampView(v: View): View {
-  const zoom = clamp(v.zoom, 1, MAX_ZOOM)
-  return { zoom, x: clamp(v.x, 0, 1 - 1 / zoom), y: clamp(v.y, 0, ASPECT * (1 - 1 / zoom)) }
+/**
+ * Keep the zoom in range and the window on the page. `viewAspect` is the
+ * pad's height / width on screen. A page narrower than the window is centred;
+ * a page shorter than the window sits at the top.
+ */
+export function clampView(v: View, viewAspect: number, pageH: number): View {
+  const zoom = clamp(v.zoom, MIN_ZOOM, MAX_ZOOM)
+  const vw = 1 / zoom
+  const vh = viewAspect / zoom
+  return {
+    zoom,
+    x: vw > 1 ? -(vw - 1) / 2 : clamp(v.x, 0, 1 - vw),
+    y: vh >= pageH ? 0 : clamp(v.y, 0, pageH - vh),
+  }
 }
 
-/**
- * Zoom to `zoom`, keeping the page point under (sx, sy) where it is on screen.
- * (sx, sy) are screen positions as a fraction of the pad's width.
- */
-export function zoomAround(v: View, zoom: number, sx: number, sy: number): View {
+/** Zoom to `zoom`, keeping the page point under (sx, sy) where it is. (sx, sy) are fractions of the pad's width. */
+export function zoomAround(v: View, zoom: number, sx: number, sy: number, viewAspect: number, pageH: number): View {
   const px = v.x + sx / v.zoom
   const py = v.y + sy / v.zoom
-  const z = clamp(zoom, 1, MAX_ZOOM)
-  return clampView({ zoom: z, x: px - sx / z, y: py - sy / z })
+  const z = clamp(zoom, MIN_ZOOM, MAX_ZOOM)
+  return clampView({ zoom: z, x: px - sx / z, y: py - sy / z }, viewAspect, pageH)
+}
+
+/** Page height needed so zooming out shows paper, not a void: at least what's on screen. */
+export function grownPage(pageH: number, zoom: number, viewAspect: number): number {
+  return clamp(Math.max(pageH, viewAspect / zoom), ASPECT, MAX_PAGE_H)
+}
+
+/** How tall the exported image needs to be to hold the ink (rounded up, between 4:3 and the page). */
+export function exportHeight(maxInkY: number, pageH: number): number {
+  return clamp(Math.ceil((maxInkY + 0.06) / 0.125) * 0.125, ASPECT, Math.max(ASPECT, pageH))
 }
 
 /**
@@ -120,13 +147,16 @@ export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseU
   const [ops, setOps] = useState<Op[]>([])
   const [savedLength, setSavedLength] = useState(0)
   const [tool, setTool] = useState<Tool>('pen')
-  const [width, setWidth] = useState(0)
+  /** The pad's size on screen, in CSS px. */
+  const [size, setSize] = useState({ w: 0, h: 0 })
   const [base, setBase] = useState<HTMLCanvasElement | null>(null)
-  const [view, setViewState] = useState<View>({ zoom: 1, x: 0, y: 0 })
+  const [pageH, setPageH] = useState(ASPECT)
+  const [rawView, setRawView] = useState<View>({ zoom: 1, x: 0, y: 0 })
   const [expanded, setExpanded] = useState(false)
-  const viewRef = useRef(view)
-  viewRef.current = view
-  const setView = (v: View) => setViewState(clampView(v))
+  const viewAspect = size.w ? size.h / size.w : ASPECT
+  const view = clampView(rawView, viewAspect, pageH)
+  const live = useRef({ view, viewAspect, pageH })
+  live.current = { view, viewAspect, pageH }
   const drawing = useRef<{ id: number; op: Extract<Op, { kind: 'stroke' }> } | null>(null)
   const pointers = useRef(new Map<number, { x: number; y: number; type: string }>())
   const gesture = useRef<Gesture | null>(null)
@@ -135,85 +165,134 @@ export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseU
   const opsCount = useRef(0)
   opsCount.current = ops.length
 
+  /** Set the view; zooming out grows the page so there is paper to see and write on. */
+  const setView = useCallback((v: View) => {
+    const { viewAspect: a, pageH: h } = live.current
+    const zoom = clamp(v.zoom, MIN_ZOOM, MAX_ZOOM)
+    const grown = grownPage(h, zoom, a)
+    if (grown !== h) setPageH(grown)
+    setRawView(clampView({ ...v, zoom }, a, grown))
+  }, [])
+
   useEffect(() => onDirtyChange?.(dirty), [dirty])
-  // Move only makes sense zoomed in (its button hides at 100%): fall back to the pen.
-  useEffect(() => {
-    if (view.zoom <= 1 && tool === 'hand') setTool('pen')
-  }, [view.zoom, tool])
 
   // Load the saved working as the bottom layer, unless the student has
   // already started drawing (then their strokes already include it).
   useEffect(() => {
     if (!baseUrl || opsCount.current > 0) return
     const img = new Image()
-    img.onload = () => setBase(inkOnly(img))
+    img.onload = () => {
+      const b = inkOnly(img)
+      setBase(b)
+      setPageH((h) => clamp(Math.max(h, b.height / b.width), ASPECT, MAX_PAGE_H))
+    }
     img.src = baseUrl
   }, [baseUrl])
 
-  // The pad moves into a portal in full screen, so re-observe the new element.
+  // Track the pad's size. Inline it is 4:3 at the column's width; in full
+  // screen it fills the space under the toolbar. Re-observe after the portal swap.
   useEffect(() => {
     const el = wrapRef.current
     if (!el) return
-    const ro = new ResizeObserver(([entry]) => setWidth(Math.round(entry.contentRect.width)))
+    const ro = new ResizeObserver(([entry]) => {
+      const w = Math.round(entry.contentRect.width)
+      setSize({ w, h: expanded ? Math.round(entry.contentRect.height) : Math.round(w * ASPECT) })
+    })
     ro.observe(el)
     return () => ro.disconnect()
   }, [expanded])
 
-  /** Draw base + ops onto a context whose page is `w` px wide. */
-  const paint = useCallback(
-    (ctx: CanvasRenderingContext2D, w: number, list: Op[]) => {
-      const h = w * ASPECT
-      ctx.clearRect(0, 0, w, h)
+  // A tall window (full screen on a phone, or zoomed out) always shows paper, never a void.
+  useEffect(() => {
+    const grown = grownPage(pageH, view.zoom, viewAspect)
+    if (grown !== pageH) setPageH(grown)
+  }, [viewAspect, view.zoom, pageH])
+
+  // Move only makes sense when there is somewhere to move to.
+  const canPan = view.zoom > 1 || viewAspect / view.zoom < pageH - 1e-6
+  useEffect(() => {
+    if (!canPan && tool === 'hand') setTool('pen')
+  }, [canPan, tool])
+
+  /** Draw base + ink onto a context whose page is `s` px wide. Ink outside the page is clipped. */
+  const paintInk = useCallback(
+    (ctx: CanvasRenderingContext2D, s: number, list: Op[], h: number) => {
+      ctx.save()
+      ctx.beginPath()
+      ctx.rect(0, 0, s, s * h)
+      ctx.clip()
+      ctx.clearRect(0, 0, s, s * h)
       const lastClear = list.map((o) => o.kind).lastIndexOf('clear')
-      if (base && lastClear === -1) ctx.drawImage(base, 0, 0, w, h)
+      if (base && lastClear === -1) ctx.drawImage(base, 0, 0, s, (s * base.height) / base.width)
       for (const op of list.slice(lastClear + 1)) {
         if (op.kind !== 'stroke' || op.points.length === 0) continue
         ctx.globalCompositeOperation = op.tool === 'eraser' ? 'destination-out' : 'source-over'
         ctx.strokeStyle = INK
         ctx.fillStyle = INK
-        ctx.lineWidth = (op.tool === 'eraser' ? ERASER_WIDTH : PEN_WIDTH) * w
+        ctx.lineWidth = (op.tool === 'eraser' ? ERASER_WIDTH : PEN_WIDTH) * s
         ctx.lineCap = 'round'
         ctx.lineJoin = 'round'
         const [first, ...rest] = op.points
         if (rest.length === 0) {
           ctx.beginPath()
-          ctx.arc(first.x * w, first.y * w, ctx.lineWidth / 2, 0, Math.PI * 2)
+          ctx.arc(first.x * s, first.y * s, ctx.lineWidth / 2, 0, Math.PI * 2)
           ctx.fill()
           continue
         }
         ctx.beginPath()
-        ctx.moveTo(first.x * w, first.y * w)
-        for (const p of rest) ctx.lineTo(p.x * w, p.y * w)
+        ctx.moveTo(first.x * s, first.y * s)
+        for (const p of rest) ctx.lineTo(p.x * s, p.y * s)
         ctx.stroke()
       }
-      ctx.globalCompositeOperation = 'source-over'
+      ctx.restore()
     },
     [base],
   )
 
-  /** Paint the visible part of the page at the current zoom. */
+  /** Paint the visible window: ink, then the grid and paper behind it. */
   const redraw = useCallback(
     (list: Op[]) => {
       const canvas = canvasRef.current
-      if (!canvas || !width) return
+      if (!canvas || !size.w) return
       const dpr = window.devicePixelRatio || 1
-      const h = Math.round(width * ASPECT)
-      if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(h * dpr)) {
-        canvas.width = Math.round(width * dpr)
-        canvas.height = Math.round(h * dpr)
+      if (canvas.width !== Math.round(size.w * dpr) || canvas.height !== Math.round(size.h * dpr)) {
+        canvas.width = Math.round(size.w * dpr)
+        canvas.height = Math.round(size.h * dpr)
       }
       const ctx = canvas.getContext('2d')!
-      const v = viewRef.current
+      const { view: v, pageH: h } = live.current
       ctx.setTransform(1, 0, 0, 1, 0, 0)
       ctx.clearRect(0, 0, canvas.width, canvas.height)
-      const page = width * v.zoom
-      ctx.setTransform(dpr, 0, 0, dpr, -v.x * page * dpr, -v.y * page * dpr)
-      paint(ctx, page, list)
+      const s = size.w * v.zoom
+      ctx.setTransform(dpr, 0, 0, dpr, -v.x * s * dpr, -v.y * s * dpr)
+      paintInk(ctx, s, list, h)
+      // Paper and grid go *behind* the ink, so the eraser never erases them.
+      const css = getComputedStyle(document.documentElement)
+      ctx.globalCompositeOperation = 'destination-over'
+      ctx.strokeStyle = css.getPropertyValue('--color-grid').trim() || '#ece6da'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      const cell = s / GRID_CELLS
+      for (let x = cell; x < s - 0.5; x += cell) {
+        ctx.moveTo(Math.round(x) + 0.5, 0)
+        ctx.lineTo(Math.round(x) + 0.5, s * h)
+      }
+      for (let y = cell; y < s * h - 0.5; y += cell) {
+        ctx.moveTo(0, Math.round(y) + 0.5)
+        ctx.lineTo(s, Math.round(y) + 0.5)
+      }
+      ctx.stroke()
+      ctx.fillStyle = css.getPropertyValue('--color-background').trim() || '#faf8f3'
+      ctx.fillRect(0, 0, s, s * h)
+      ctx.globalCompositeOperation = 'source-over'
     },
-    [width, paint],
+    [size, paintInk],
   )
 
-  useEffect(() => redraw(drawing.current ? [...ops, drawing.current.op] : ops), [ops, redraw, view, expanded])
+  useEffect(
+    () => redraw(drawing.current ? [...ops, drawing.current.op] : ops),
+    [ops, redraw, view.zoom, view.x, view.y, pageH, expanded],
+  )
 
   const isEmpty = (list: Op[]) => {
     const lastClear = list.map((o) => o.kind).lastIndexOf('clear')
@@ -223,6 +302,14 @@ export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseU
   const hasInk = !isEmpty(ops)
   useEffect(() => onInkChange?.(hasInk), [hasInk])
 
+  /** Lowest point with ink (page units), for trimming the export. */
+  const inkBottom = (list: Op[]) => {
+    const lastClear = list.map((o) => o.kind).lastIndexOf('clear')
+    let y = base && lastClear === -1 ? base.height / base.width : 0
+    for (const op of list.slice(lastClear + 1)) if (op.kind === 'stroke' && op.tool === 'pen') for (const p of op.points) y = Math.max(y, p.y)
+    return y
+  }
+
   useImperativeHandle(
     ref,
     () => ({
@@ -230,10 +317,11 @@ export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseU
       markSaved: () => setSavedLength(ops.length),
       exportPng: async () => {
         if (isEmpty(ops)) return null
+        const h = exportHeight(inkBottom(ops), pageH)
         const ink = document.createElement('canvas')
         ink.width = EXPORT_WIDTH
-        ink.height = Math.round(EXPORT_WIDTH * ASPECT)
-        paint(ink.getContext('2d')!, EXPORT_WIDTH, ops)
+        ink.height = Math.round(EXPORT_WIDTH * h)
+        paintInk(ink.getContext('2d')!, EXPORT_WIDTH, ops, h)
         // Erased pixels are transparent: put the ink on white paper.
         const out = document.createElement('canvas')
         out.width = ink.width
@@ -245,7 +333,7 @@ export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseU
         return new Promise((resolve) => out.toBlob((b) => resolve(b), 'image/png'))
       },
     }),
-    [dirty, ops, paint, base],
+    [dirty, ops, paintInk, base, pageH],
   )
 
   /** Screen position as a fraction of the pad's width. */
@@ -256,7 +344,7 @@ export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseU
   /** Screen position → page coordinates. */
   const toPage = (clientX: number, clientY: number): Point => {
     const { sx, sy } = screenFrac(clientX, clientY)
-    const v = viewRef.current
+    const v = live.current.view
     return { x: v.x + sx / v.zoom, y: v.y + sy / v.zoom }
   }
   const touches = () => [...pointers.current.values()].filter((p) => p.type === 'touch')
@@ -264,7 +352,7 @@ export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseU
   const startPinch = () => {
     const [a, b] = touches()
     const m = screenFrac((a.x + b.x) / 2, (a.y + b.y) / 2)
-    gesture.current = { kind: 'pinch', dist: Math.hypot(a.x - b.x, a.y - b.y) || 1, midX: m.sx, midY: m.sy, view: viewRef.current }
+    gesture.current = { kind: 'pinch', dist: Math.hypot(a.x - b.x, a.y - b.y) || 1, midX: m.sx, midY: m.sy, view: live.current.view, zooming: false }
   }
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -280,7 +368,7 @@ export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseU
     if (e.pointerType === 'pen') penSeen.current = true
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType })
 
-    // A second finger turns the gesture into pinch-zoom / two-finger move.
+    // A second finger: drop the half-started stroke and move (or zoom) instead.
     if (e.pointerType === 'touch' && touches().length === 2) {
       drawing.current = null
       redraw(ops)
@@ -292,7 +380,7 @@ export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseU
     // With a stylus in use, fingers and palms only move the page.
     const moveOnly = disabled || tool === 'hand' || e.button === 1 || (e.pointerType === 'touch' && penSeen.current)
     if (moveOnly) {
-      gesture.current = { kind: 'pan', id: e.pointerId, startX: e.clientX, startY: e.clientY, view: viewRef.current }
+      gesture.current = { kind: 'pan', id: e.pointerId, startX: e.clientX, startY: e.clientY, view: live.current.view }
       return
     }
     drawing.current = { id: e.pointerId, op: { kind: 'stroke', tool: tool === 'eraser' ? 'eraser' : 'pen', points: [toPage(e.clientX, e.clientY)] } }
@@ -308,7 +396,10 @@ export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseU
       if (pair.length < 2) return
       const [a, b] = pair
       const m = screenFrac((a.x + b.x) / 2, (a.y + b.y) / 2)
-      const zoom = clamp((g.view.zoom * Math.hypot(a.x - b.x, a.y - b.y)) / g.dist, 1, MAX_ZOOM)
+      const ratio = Math.hypot(a.x - b.x, a.y - b.y) / g.dist
+      // A two-finger drag moves; only a clear spread or pinch zooms.
+      if (!g.zooming && Math.abs(ratio - 1) > PINCH_DEADZONE) g.zooming = true
+      const zoom = g.zooming ? clamp(g.view.zoom * ratio, MIN_ZOOM, MAX_ZOOM) : g.view.zoom
       // Keep the page point that was under the fingers' midpoint under it now.
       const px = g.view.x + g.midX / g.view.zoom
       const py = g.view.y + g.midY / g.view.zoom
@@ -323,7 +414,7 @@ export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseU
     const d = drawing.current
     if (!d || d.id !== e.pointerId) return
     // Coalesced events keep fast stylus strokes smooth.
-    const events = e.nativeEvent.getCoalescedEvents?.() ?? [e.nativeEvent]
+    const events = e.nativeEvent.getCoalescedEvents?.() ?? []
     for (const ev of events.length ? events : [e.nativeEvent]) d.op.points.push(toPage(ev.clientX, ev.clientY))
     redraw([...ops, d.op])
   }
@@ -338,23 +429,32 @@ export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseU
     if (d && d.id === e.pointerId) {
       drawing.current = null
       setOps((list) => [...list, d.op])
+      // Writing near the bottom of the page adds room below.
+      const lowest = Math.max(...d.op.points.map((p) => p.y))
+      if (d.op.tool === 'pen' && lowest > live.current.pageH - 0.15) setPageH((h) => Math.min(MAX_PAGE_H, h + GROW))
     }
   }
 
-  // ctrl/⌘ + scroll (and trackpad pinch) zooms; plain scroll moves a zoomed page.
+  // ctrl/⌘ + scroll (and trackpad pinch) zooms; plain scroll moves the page
+  // when there's somewhere to go, otherwise it scrolls the screen as usual.
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const onWheel = (e: WheelEvent) => {
-      const v = viewRef.current
+      const { view: v, viewAspect: a, pageH: h } = live.current
       const r = canvas.getBoundingClientRect()
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault()
-        const { sx, sy } = { sx: (e.clientX - r.left) / r.width, sy: (e.clientY - r.top) / r.width }
-        setViewState(zoomAround(v, v.zoom * Math.exp(-e.deltaY * 0.01), sx, sy))
-      } else if (v.zoom > 1) {
+        const zoom = clamp(v.zoom * Math.exp(-e.deltaY * 0.01), MIN_ZOOM, MAX_ZOOM)
+        const grown = grownPage(h, zoom, a)
+        if (grown !== h) setPageH(grown)
+        setRawView(zoomAround(v, zoom, (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.width, a, grown))
+        return
+      }
+      const next = clampView({ ...v, x: v.x + e.deltaX / r.width / v.zoom, y: v.y + e.deltaY / r.width / v.zoom }, a, h)
+      if (Math.abs(next.x - v.x) > 1e-6 || Math.abs(next.y - v.y) > 1e-6) {
         e.preventDefault()
-        setViewState(clampView({ ...v, x: v.x + e.deltaX / r.width / v.zoom, y: v.y + e.deltaY / r.width / v.zoom }))
+        setRawView(next)
       }
     }
     canvas.addEventListener('wheel', onWheel, { passive: false })
@@ -372,119 +472,125 @@ export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseU
     return () => window.removeEventListener('keydown', onKey)
   }, [expanded])
 
-  /** Step the zoom from the buttons, keeping the centre of the view in place. */
+  /** Step the zoom from the buttons, keeping the middle of the view in place. */
   const stepZoom = (dir: 1 | -1) => {
-    const v = viewRef.current
+    const { view: v, viewAspect: a, pageH: h } = live.current
     const next = dir > 0 ? ZOOM_STEPS.find((z) => z > v.zoom + 0.01) : [...ZOOM_STEPS].reverse().find((z) => z < v.zoom - 0.01)
-    setViewState(zoomAround(v, next ?? v.zoom, 0.5, ASPECT / 2))
+    const zoom = next ?? v.zoom
+    const grown = grownPage(h, zoom, a)
+    if (grown !== h) setPageH(grown)
+    setRawView(zoomAround(v, zoom, 0.5, a / 2, a, grown))
   }
 
-  const page = width * view.zoom
-  const toolButton = (t: Tool, label: string, Icon: typeof Pen, testId: string) => (
+  const iconButton = (props: { label: string; icon: ReactNode; testId: string; onClick: () => void; pressed?: boolean; disabled?: boolean; variant?: 'secondary' | 'ghost' | 'outline' | 'default'; className?: string }) => (
     <Button
-      type="button" size="sm" className="px-2.5" variant={tool === t ? 'secondary' : 'ghost'} aria-pressed={tool === t}
-      onClick={() => setTool(t)} disabled={disabled && t !== 'hand'} data-testid={testId}
+      type="button" size="sm" className={`px-2 sm:px-2.5 ${props.className ?? ''}`} variant={props.variant ?? 'ghost'} aria-pressed={props.pressed}
+      onClick={props.onClick} disabled={props.disabled} data-testid={props.testId} aria-label={props.label} title={props.label}
     >
-      <Icon aria-hidden /> {label}
+      {props.icon}
+      <span className="hidden sm:inline">{props.label}</span>
     </Button>
   )
 
-  const pad = (
-    <div
-      className={
-        expanded
-          ? 'fixed inset-0 z-50 flex touch-none select-none flex-col gap-2 overscroll-contain bg-background p-3 [-webkit-touch-callout:none]'
-          : 'grid select-none gap-2 [-webkit-touch-callout:none]'
-      }
-      role={expanded ? 'dialog' : undefined}
-      aria-modal={expanded || undefined}
-      aria-label={expanded ? 'Working, full screen' : undefined}
-      data-testid={expanded ? 'work-fullscreen' : 'work-pad'}
-    >
-      {expanded && fullScreenHeading && (
-        <div className="mx-auto max-h-24 w-full max-w-5xl overflow-y-auto text-center text-foreground" data-testid="work-fullscreen-heading">
-          {fullScreenHeading}
-        </div>
-      )}
-      <div className={`flex flex-wrap items-center gap-1 ${expanded ? 'mx-auto w-full max-w-5xl' : ''}`} role="toolbar" aria-label="Drawing tools">
-        {toolButton('pen', 'Pen', Pen, 'work-pen')}
-        {toolButton('eraser', 'Eraser', Eraser, 'work-eraser')}
-        {view.zoom > 1 && toolButton('hand', 'Move', Hand, 'work-hand')}
-        <span className="mx-1 inline-flex items-center rounded-lg border border-input">
-          <Button type="button" size="sm" variant="ghost" className="px-2" onClick={() => stepZoom(-1)} disabled={view.zoom <= 1} aria-label="Zoom out" data-testid="work-zoom-out">
-            <ZoomOut aria-hidden />
-          </Button>
-          <span className="w-11 text-center text-xs tabular-nums text-muted-foreground" aria-live="polite" data-testid="work-zoom-level">
-            {Math.round(view.zoom * 100)}%
-          </span>
-          <Button type="button" size="sm" variant="ghost" className="px-2" onClick={() => stepZoom(1)} disabled={view.zoom >= MAX_ZOOM} aria-label="Zoom in" data-testid="work-zoom-in">
-            <ZoomIn aria-hidden />
-          </Button>
+  const toolbar = (
+    <div className={`flex flex-wrap items-center gap-0.5 sm:gap-1 ${expanded ? 'mx-auto w-full max-w-6xl' : ''}`} role="toolbar" aria-label="Drawing tools">
+      {iconButton({ label: 'Pen', icon: <Pen aria-hidden />, testId: 'work-pen', onClick: () => setTool('pen'), pressed: tool === 'pen', disabled, variant: tool === 'pen' ? 'secondary' : 'ghost' })}
+      {iconButton({ label: 'Eraser', icon: <Eraser aria-hidden />, testId: 'work-eraser', onClick: () => setTool('eraser'), pressed: tool === 'eraser', disabled, variant: tool === 'eraser' ? 'secondary' : 'ghost' })}
+      {canPan && iconButton({ label: 'Move', icon: <Hand aria-hidden />, testId: 'work-hand', onClick: () => setTool('hand'), pressed: tool === 'hand', variant: tool === 'hand' ? 'secondary' : 'ghost' })}
+      <span className="mx-0.5 inline-flex items-center rounded-lg border border-input">
+        <Button type="button" size="sm" variant="ghost" className="px-1.5 sm:px-2" onClick={() => stepZoom(-1)} disabled={view.zoom <= MIN_ZOOM + 0.01} aria-label="Zoom out" title="Zoom out" data-testid="work-zoom-out">
+          <ZoomOut aria-hidden />
+        </Button>
+        <span className="w-9 text-center text-xs tabular-nums text-muted-foreground sm:w-10" aria-live="polite" data-testid="work-zoom-level">
+          {Math.round(view.zoom * 100)}%
         </span>
-        <Button
-          type="button" size="sm" variant="ghost" className="ml-auto px-2.5" onClick={() => setOps((l) => l.slice(0, -1))}
-          disabled={disabled || ops.length === 0} data-testid="work-undo"
-        >
-          <Undo2 aria-hidden /> Undo
+        <Button type="button" size="sm" variant="ghost" className="px-1.5 sm:px-2" onClick={() => stepZoom(1)} disabled={view.zoom >= MAX_ZOOM - 0.01} aria-label="Zoom in" title="Zoom in" data-testid="work-zoom-in">
+          <ZoomIn aria-hidden />
         </Button>
-        <Button
-          type="button" size="sm" variant="ghost" className="px-2.5" onClick={() => setOps((l) => [...l, { kind: 'clear' }])}
-          disabled={disabled || isEmpty(ops)} data-testid="work-clear"
-        >
-          <Trash2 aria-hidden /> Clear
-        </Button>
-        <Button
-          type="button" size="sm" variant={expanded ? 'default' : 'outline'} className="px-2.5" onClick={() => setExpanded((x) => !x)}
-          aria-pressed={expanded} data-testid="work-expand"
-        >
-          {expanded ? <Minimize2 aria-hidden /> : <Maximize2 aria-hidden />} {expanded ? 'Done' : 'Full screen'}
-        </Button>
-      </div>
-      <div
-        ref={wrapRef}
-        className={`paper-grid overflow-hidden rounded-xl border border-input ${expanded ? 'mx-auto' : ''}`}
-        // In full screen, the biggest 4:3 pad that fits under the toolbar.
-        style={{
-          width: expanded ? `min(100%, calc((100dvh - ${fullScreenHeading ? 13 : 7.5}rem) / 0.75))` : undefined,
-          backgroundSize: `${GRID * view.zoom}px ${GRID * view.zoom}px`,
-          backgroundPosition: `${-view.x * page - 1}px ${-view.y * page - 1}px`,
-        }}
-      >
-        <canvas
-          ref={canvasRef}
-          data-testid="work-canvas"
-          aria-label="Working area. Draw your steps with a finger, stylus or mouse."
-          role="img"
-          className={`block w-full touch-none ${
-            disabled ? 'cursor-not-allowed opacity-60' : tool === 'hand' ? 'cursor-grab' : tool === 'eraser' ? 'cursor-cell' : 'cursor-crosshair'
-          }`}
-          style={{ height: width ? Math.round(width * ASPECT) : undefined, aspectRatio: width ? undefined : `${1 / ASPECT}` }}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          onContextMenu={(e) => e.preventDefault()}
-        />
-      </div>
-      <p className={`text-xs text-muted-foreground ${expanded ? 'text-center' : ''}`}>
-        Zoom with + and −, a pinch, or ctrl/⌘ + scroll. Move around with two fingers or the Move tool.
-        {expanded ? ' Press Done (or Esc) to go back.' : ''}
-      </p>
-      {expanded && (
-        <p className="hidden text-center text-sm font-medium text-foreground portrait:block" data-testid="work-rotate-tip">
-          Tip: turn your phone sideways for a bigger pad.
-        </p>
-      )}
+      </span>
+      {iconButton({
+        label: 'More space', icon: <ArrowDownToLine aria-hidden />, testId: 'work-more-space', disabled: disabled || pageH >= MAX_PAGE_H - 1e-6,
+        onClick: () => {
+          const { view: v, viewAspect: a } = live.current
+          const h = Math.min(MAX_PAGE_H, pageH + GROW)
+          setPageH(h)
+          // Show the new room: scroll to the bottom of the page.
+          setRawView(clampView({ ...v, y: h }, a, h))
+        },
+      })}
+      {iconButton({ label: 'Undo', icon: <Undo2 aria-hidden />, testId: 'work-undo', onClick: () => setOps((l) => l.slice(0, -1)), disabled: disabled || ops.length === 0, className: 'ml-auto' })}
+      {iconButton({ label: 'Clear', icon: <Trash2 aria-hidden />, testId: 'work-clear', onClick: () => setOps((l) => [...l, { kind: 'clear' }]), disabled: disabled || isEmpty(ops) })}
+      {iconButton({
+        label: expanded ? 'Done' : 'Full screen', icon: expanded ? <Minimize2 aria-hidden /> : <Maximize2 aria-hidden />, testId: 'work-expand',
+        onClick: () => setExpanded((x) => !x), pressed: expanded, variant: expanded ? 'default' : 'outline',
+      })}
     </div>
   )
 
-  if (!expanded) return pad
+  const canvas = (
+    <canvas
+      ref={canvasRef}
+      data-testid="work-canvas"
+      aria-label="Working area. Draw your steps with a finger, stylus or mouse."
+      role="img"
+      className={`block touch-none ${
+        disabled ? 'cursor-not-allowed opacity-60' : tool === 'hand' ? 'cursor-grab' : tool === 'eraser' ? 'cursor-cell' : 'cursor-crosshair'
+      }`}
+      style={{ width: size.w || '100%', height: size.h || undefined, aspectRatio: size.w ? undefined : `${1 / ASPECT}` }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onContextMenu={(e) => e.preventDefault()}
+    />
+  )
+
+  const hint = 'Zoom with + and −, a pinch, or ctrl/⌘ + scroll; zoom out or tap More space for more room. Move with two fingers or the Move tool.'
+
+  if (!expanded) {
+    return (
+      <div className="grid select-none gap-2 [-webkit-touch-callout:none]" data-testid="work-pad">
+        {toolbar}
+        <div ref={wrapRef} className="overflow-hidden rounded-xl border border-input bg-muted/60">
+          {canvas}
+        </div>
+        <p className="text-xs text-muted-foreground">{hint}</p>
+      </div>
+    )
+  }
+
   return (
     <>
       <div className="paper-grid grid place-items-center rounded-xl border border-dashed border-input text-sm text-muted-foreground" style={{ aspectRatio: `${1 / ASPECT}` }}>
         Drawing in full screen…
       </div>
-      {createPortal(pad, document.body)}
+      {createPortal(
+        <div
+          className="fixed inset-0 z-50 flex touch-none select-none flex-col gap-2 overscroll-contain bg-background p-2 sm:p-3 [-webkit-touch-callout:none]"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Working, full screen"
+          data-testid="work-fullscreen"
+        >
+          {fullScreenHeading && (
+            <div
+              className="mx-auto max-h-20 w-full max-w-6xl shrink-0 overflow-y-auto text-center text-sm text-foreground [&_.katex-display]:my-0 [@media(max-height:500px)]:max-h-14 [@media(max-height:500px)]:text-xs"
+              data-testid="work-fullscreen-heading"
+            >
+              {fullScreenHeading}
+            </div>
+          )}
+          {toolbar}
+          {/* The pad takes every pixel that's left. */}
+          <div ref={wrapRef} className="relative min-h-0 w-full flex-1 overflow-hidden rounded-xl border border-input bg-muted/60">
+            {canvas}
+          </div>
+          <p className="shrink-0 text-center text-xs text-muted-foreground [@media(max-height:500px)]:hidden">
+            {hint} Done or Esc to go back.
+          </p>
+        </div>,
+        document.body,
+      )}
     </>
   )
 })

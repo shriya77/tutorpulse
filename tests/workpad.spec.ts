@@ -21,6 +21,31 @@ async function syntheticStroke(page: Page, pointerType: 'pen' | 'touch', pointer
   )
 }
 
+/** Two synthetic touches moving together; `spread` scales the gap between them by the end. */
+async function twoFingers(page: Page, dy: number, spread: number, wobble = 0) {
+  await page.getByTestId('work-canvas').evaluate(
+    (c: HTMLCanvasElement, { dy, spread, wobble }) => {
+      const r = c.getBoundingClientRect()
+      const cx = r.left + r.width / 2
+      const cy = r.top + r.height / 2
+      const ev = (type: string, id: number, x: number, y: number) =>
+        c.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: y, pointerId: id, pointerType: 'touch', isPrimary: id === 51, bubbles: true, buttons: 1 }))
+      const gap = 60
+      ev('pointerdown', 51, cx - gap, cy)
+      ev('pointerdown', 52, cx + gap, cy)
+      for (let i = 1; i <= 10; i++) {
+        const t = i / 10
+        const g = gap * (1 + (spread - 1) * t) * (1 + (i % 2 ? wobble : -wobble))
+        ev('pointermove', 51, cx - g, cy + dy * t)
+        ev('pointermove', 52, cx + g, cy + dy * t)
+      }
+      ev('pointerup', 51, cx - gap * spread, cy + dy)
+      ev('pointerup', 52, cx + gap * spread, cy + dy)
+    },
+    { dy, spread, wobble },
+  )
+}
+
 test('the pad zooms, goes full screen, never selects text, and ignores palms', async ({ users }) => {
   test.setTimeout(150_000)
   const [tutor, student] = await users(2)
@@ -98,6 +123,34 @@ test('the pad zooms, goes full screen, never selects text, and ignores palms', a
     await expect(page.getByTestId('work-zoom-level')).toHaveText('100%')
     await expect(page.getByTestId('work-hand')).toHaveCount(0)
 
+    // Zooming out shows more paper to write on (and Move appears, as there's somewhere to go).
+    await page.getByTestId('work-zoom-out').click()
+    await expect(page.getByTestId('work-zoom-level')).toHaveText('75%')
+    await page.getByTestId('work-zoom-out').click()
+    await expect(page.getByTestId('work-zoom-level')).toHaveText('50%')
+    await expect(page.getByTestId('work-zoom-out')).toBeDisabled()
+    await page.mouse.move(box.x + box.width * 0.45, box.y + box.height * 0.85)
+    await page.mouse.down()
+    await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.95, { steps: 4 })
+    await page.mouse.up() // writing low on the zoomed-out page, i.e. below the old 4:3 page
+    await page.getByTestId('work-zoom-in').click()
+    await page.getByTestId('work-zoom-in').click()
+    await expect(page.getByTestId('work-zoom-level')).toHaveText('100%')
+    await expect(page.getByTestId('work-hand')).toBeVisible() // the page is taller now, so it can move
+    await expect(page.getByTestId('work-more-space')).toBeEnabled()
+
+    // Two fingers: a drag with natural wobble in the finger gap only moves (no zoom
+    // creep, no ink); a clear spread zooms.
+    const level = page.getByTestId('work-zoom-level')
+    const undoWasEnabled = await page.getByTestId('work-undo').isEnabled()
+    await twoFingers(page, -80, 1, 0.06)
+    await expect(level).toHaveText('100%')
+    await twoFingers(page, 0, 1.8)
+    await expect(level).not.toHaveText('100%')
+    expect(await page.getByTestId('work-undo').isEnabled()).toBe(undoWasEnabled)
+    await page.getByTestId('work-zoom-out').click()
+    while ((await level.textContent()) !== '100%') await page.getByTestId((Number.parseInt((await level.textContent()) ?? '100') > 100) ? 'work-zoom-out' : 'work-zoom-in').click()
+
     // 3. Full screen covers the whole window, so the rest of the page can't be touched.
     const answerBox = (await page.getByTestId('answer-input').boundingBox())!
     await page.getByTestId('work-expand').click()
@@ -105,7 +158,10 @@ test('the pad zooms, goes full screen, never selects text, and ignores palms', a
     await expect(full).toBeVisible()
     expect(await full.boundingBox()).toMatchObject({ x: 0, y: 0, width: 1000, height: 700 })
     await expect(page.getByTestId('work-fullscreen-heading')).toContainText('sin') // the question stays in view
-    await expect(page.getByTestId('work-rotate-tip')).toBeHidden() // landscape laptop: no tip
+    // The pad fills the window under the question and toolbar.
+    const fsCanvas = (await page.getByTestId('work-canvas').boundingBox())!
+    expect(fsCanvas.width).toBeGreaterThan(900)
+    expect(fsCanvas.height).toBeGreaterThan(400)
     const hit = await page.evaluate(
       ({ x, y }) => !!document.elementFromPoint(x, y)?.closest('[data-testid="work-fullscreen"]'),
       { x: answerBox.x + answerBox.width / 2, y: Math.min(answerBox.y + answerBox.height / 2, 690) },
@@ -123,8 +179,23 @@ test('the pad zooms, goes full screen, never selects text, and ignores palms', a
     await page.getByTestId('work-expand').click()
     await expect(full).toBeVisible()
     expect(await full.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
-    await expect(page.getByTestId('work-rotate-tip')).toBeVisible() // portrait: suggest landscape
+    const phoneCanvas = (await page.getByTestId('work-canvas').boundingBox())!
+    expect(phoneCanvas.height).toBeGreaterThan(500) // a tall pad, not a 4:3 strip
+    // The toolbar fits on one row on a phone: every button overlaps the first one vertically.
+    const oneRow = await page.getByRole('toolbar', { name: 'Drawing tools' }).evaluate((el) => {
+      const first = (el.children[0] as HTMLElement).getBoundingClientRect()
+      return [...el.children].every((c) => (c as HTMLElement).getBoundingClientRect().top < first.bottom)
+    })
+    expect(oneRow).toBe(true)
     await page.screenshot({ path: 'test-results/workpad-fullscreen-phone.png' })
+    // Phone on its side: still a big pad, not a thumbnail.
+    await page.setViewportSize({ width: 844, height: 390 })
+    await expect.poll(async () => (await page.getByTestId('work-canvas').boundingBox())!.width).toBeGreaterThan(780)
+    expect((await page.getByTestId('work-canvas').boundingBox())!.height).toBeGreaterThan(200)
+    const heading = (await page.getByTestId('work-fullscreen-heading').evaluate((el) => ({ scroll: el.scrollHeight, client: el.clientHeight })))
+    expect(heading.scroll).toBeLessThanOrEqual(heading.client + 1) // the question fits, not cut off
+    await page.screenshot({ path: 'test-results/workpad-fullscreen-landscape.png' })
+    await page.setViewportSize({ width: 390, height: 844 })
     await page.getByTestId('work-expand').click()
     await expect(full).toHaveCount(0)
     await page.setViewportSize({ width: 1000, height: 700 })
