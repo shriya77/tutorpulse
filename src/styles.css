@@ -276,3 +276,20 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .banner-flash { animation: none; }
 }
+
+/* Printing (the session report): let the whole page flow onto paper instead of
+   the app's fixed-height scroller, and print in the light palette even in dark mode. */
+@media print {
+  .app-shell { height: auto !important; overflow: visible !important; display: block !important; }
+  .app-shell > main { overflow: visible !important; }
+  [data-theme="notebook-night"] {
+    --color-background: #ffffff;
+    --color-foreground: #1d2b3a;
+    --color-card: #ffffff;
+    --color-card-foreground: #1d2b3a;
+    --color-muted-foreground: #5b6676;
+    --color-border: #e7dfcf;
+    --color-primary: #2b4c9b;
+  }
+  body { background: #ffffff; }
+}

@@ -51,14 +51,14 @@ export function ConnectionBanner() {
 
   if (back) {
     return (
-      <div role="status" className="bg-success/12 px-4 py-1.5 text-center text-sm font-medium text-success" data-testid="connection-back">
+      <div role="status" className="bg-success/12 print:hidden px-4 py-1.5 text-center text-sm font-medium text-success" data-testid="connection-back">
         Back online
       </div>
     )
   }
   if (!show) return null
   return (
-    <div role="status" aria-live="polite" className="flex items-center justify-center gap-2 bg-highlight/60 px-4 py-1.5 text-center text-sm text-foreground" data-testid="connection-banner">
+    <div role="status" aria-live="polite" className="flex items-center justify-center gap-2 print:hidden bg-highlight/60 px-4 py-1.5 text-center text-sm text-foreground" data-testid="connection-banner">
       <WifiOff aria-hidden className="size-4 shrink-0" />
       {online
         ? 'Reconnecting… Live updates are paused; this page catches up by itself.'

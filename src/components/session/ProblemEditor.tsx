@@ -38,7 +38,7 @@ function useKeyInfo(answer: string): { tex: string | null; warning: string | nul
 }
 
 /** The saved key as maths (the text as typed is in the tooltip), or as typed if it can't be read. */
-function KeyMath({ answer }: { answer: string }) {
+export function KeyMath({ answer }: { answer: string }) {
   const { tex } = useKeyInfo(answer)
   if (!tex) return <code className="font-mono text-foreground">{answer}</code>
   return (

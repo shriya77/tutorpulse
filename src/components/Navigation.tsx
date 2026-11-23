@@ -70,7 +70,7 @@ export default function Navigation() {
 
   return (
     <>
-      <nav data-testid="app-navigation" className="border-b border-border bg-card/90 backdrop-blur">
+      <nav data-testid="app-navigation" className="border-b border-border bg-card/90 backdrop-blur print:hidden">
         <div className="mx-auto flex h-14 max-w-5xl items-center gap-4 px-4">
           <Link to="/home" className="flex items-center gap-2 text-foreground" aria-label={`${APP_NAME} home`}>
             <span aria-hidden className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">

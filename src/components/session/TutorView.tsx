@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutations } from 'deepspace'
 import { Badge, Button, Input, Label } from '@/components/ui'
 import type { ClusterData, Envelope, FollowUpData, ProblemData, SessionData, SubmissionData } from '../../actions/types'
@@ -13,8 +14,10 @@ import { useAnswerKeys, useFollowUps, useSessionClusters, useSessionProblems, us
 import { callAction } from '../../lib/callAction'
 import { useWorkImage } from '../../hooks/useWorkImage'
 import { OTHER_LABEL } from '../../lib/clusters'
+import { commonWrongAnswers } from '../../lib/wrongAnswers'
 import { MathText } from '../MathText'
 import { ProblemEditor } from './ProblemEditor'
+import { ProblemBank } from './ProblemBank'
 import { JoinQr } from './JoinQr'
 import { NotesPanel } from './NotesPanel'
 import { PracticeSetPanel } from './PracticeSetPanel'
@@ -37,6 +40,7 @@ export function TutorView({ session }: { session: Envelope<SessionData> }) {
         <OpenSessionBar session={session} problemCount={problems.length} missingKeys={problems.filter((p) => !byProblem.has(p.recordId)).length} />
         <TopicPicker session={session} />
         <ProblemEditor sessionId={session.recordId} problems={problems} keys={byProblem} />
+        <ProblemBank sessionId={session.recordId} sessionTopic={session.data.topic} nextOrder={(problems.at(-1)?.data.order ?? 0) + 1} current={problems.map((p) => p.data.prompt)} />
         <NotesPanel sessionId={session.recordId} />
         <ManageSession session={session} />
       </div>
@@ -55,6 +59,7 @@ export function TutorView({ session }: { session: Envelope<SessionData> }) {
           {editing ? 'Done editing problems' : 'Edit problems'}
         </Button>
         {editing && <ProblemEditor sessionId={session.recordId} problems={problems} keys={byProblem} />}
+        {editing && <ProblemBank sessionId={session.recordId} sessionTopic={session.data.topic} nextOrder={(problems.at(-1)?.data.order ?? 0) + 1} current={problems.map((p) => p.data.prompt)} />}
         {editing && session.data.status === 'open' && <TopicPicker session={session} />}
         {editing && session.data.status === 'open' && <NotesPanel sessionId={session.recordId} />}
       </section>
@@ -146,6 +151,9 @@ function LiveHeader({ session }: { session: Envelope<SessionData> }) {
               {session.data.joinCode}
             </p>
           )}
+          <Link to={`/report/${session.recordId}`} className="mt-1 inline-block text-sm font-medium text-primary hover:underline" data-testid="report-link">
+            Session report
+          </Link>
           {/* While nobody has joined, the roster below already says so. */}
           {(joined > 0 || !live) && (
             <p className="mt-1 text-sm text-muted-foreground" data-testid="joined-count">
@@ -186,6 +194,8 @@ interface ProblemStats {
   needsReview: number
   /** Who answered (for "N of M answered", which counts only students still in the session). */
   studentIds: Set<string>
+  /** Final answers that are still wrong, as typed (for "most common wrong answers"). */
+  wrongAnswers: string[]
 }
 
 function Board({
@@ -211,9 +221,10 @@ function Board({
   const stats = useMemo(() => {
     const m = new Map<string, ProblemStats>()
     for (const s of submissions as Envelope<SubmissionData>[]) {
-      const st = m.get(s.data.problemId) ?? { submitted: 0, correct: 0, needsReview: 0, studentIds: new Set<string>() }
+      const st = m.get(s.data.problemId) ?? { submitted: 0, correct: 0, needsReview: 0, studentIds: new Set<string>(), wrongAnswers: [] }
       st.submitted++
       st.studentIds.add(s.data.studentId)
+      if (s.data.isCorrect !== 1) st.wrongAnswers.push(s.data.answer ?? '')
       if (s.data.isCorrect === 1) st.correct++
       if (s.data.needsReview === 1) st.needsReview++
       m.set(s.data.problemId, st)
@@ -251,7 +262,7 @@ function Board({
             index={i}
             problem={p}
             session={session}
-            stats={stats.get(p.recordId) ?? { submitted: 0, correct: 0, needsReview: 0, studentIds: new Set<string>() }}
+            stats={stats.get(p.recordId) ?? { submitted: 0, correct: 0, needsReview: 0, studentIds: new Set<string>(), wrongAnswers: [] }}
             clusters={clustersByProblem.get(p.recordId) ?? []}
             submissionById={submissionById}
           />
@@ -263,7 +274,7 @@ function Board({
                   index={i}
                   problem={f}
                   session={session}
-                  stats={stats.get(f.recordId) ?? { submitted: 0, correct: 0, needsReview: 0, studentIds: new Set<string>() }}
+                  stats={stats.get(f.recordId) ?? { submitted: 0, correct: 0, needsReview: 0, studentIds: new Set<string>(), wrongAnswers: [] }}
                   clusters={clustersByProblem.get(f.recordId) ?? []}
                   submissionById={submissionById}
                   followUp={followUpInfo.get(f.recordId) ?? { label: '', students: 0 }}
@@ -375,8 +386,28 @@ function ProblemBoardCard({
             ))}
           </ul>
         )}
+        <CommonWrongAnswers answers={stats.wrongAnswers} />
       </section>
     </article>
+  )
+}
+
+/** Identical wrong final answers given by two or more students (anonymous, so fine on the projector). */
+function CommonWrongAnswers({ answers }: { answers: string[] }) {
+  const common = useMemo(() => commonWrongAnswers(answers), [answers])
+  if (common.length === 0) return null
+  return (
+    <div className="pt-1" data-testid="common-wrong">
+      <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Most common wrong answers</h4>
+      <ul className="mt-1 flex flex-wrap gap-2">
+        {common.map((c) => (
+          <li key={c.answer} className="rounded-lg border border-border bg-background px-2.5 py-1 text-sm" data-testid="common-wrong-answer">
+            <span className="font-mono text-foreground">{c.answer}</span>
+            <span className="ml-1.5 text-muted-foreground">×{c.count}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
