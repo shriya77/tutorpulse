@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ClusterData, Envelope, ProblemData, SessionData, SubmissionData } from '../actions/types'
 import { canDownloadPracticeSet } from '../server/practice-set-routes'
-import { buildPracticeSummary } from './practice-set'
+import { buildPracticeSummary, toPracticeSections } from './practice-set'
 
 const env = <T>(recordId: string, data: T, createdBy = 'tutor'): Envelope<T> => ({ recordId, data, createdBy, createdAt: '', updatedAt: '' })
 
@@ -48,5 +48,38 @@ describe('canDownloadPracticeSet', () => {
   it('refuses strangers and sets without a file', () => {
     expect(canDownloadPracticeSet({ ...base, status: 'published' }, 'other')).toBe(false)
     expect(canDownloadPracticeSet({ ...base, status: 'published', fileKey: undefined }, 't')).toBe(false)
+  })
+})
+
+describe('toPracticeSections', () => {
+  it('writes derivative questions with mathjs and keeps the model answer only if it checks out', () => {
+    const [sec] = toPracticeSections({
+      sections: [
+        {
+          label: 'Inner derivative',
+          watchFor: 'Multiply by the inside.',
+          problems: [
+            { functionToDifferentiate: '(2x+1)/(x-3)', derivative: '-7/(x-3)^2' },
+            { functionToDifferentiate: 'sin(3x^2)', derivative: 'cos(3x^2)' },
+          ],
+        },
+      ],
+    })
+    expect(sec.problems).toHaveLength(2)
+    expect(sec.problems[0]).toMatchObject({ instruction: 'Find', verified: true, answer: '\\frac{-7}{{\\left( x-3\\right)}^{2}}' })
+    // The model's wrong answer is replaced by mathjs's derivative.
+    expect(sec.problems[1].answer).toContain('\\cos')
+    expect(sec.problems[1].answer).toContain('6')
+  })
+
+  it('drops unsafe or incomplete problems and empty sections', () => {
+    const sections = toPracticeSections({
+      sections: [
+        { label: 'A', watchFor: '', problems: [{ instruction: 'Evaluate.', math: '\\input{x}', answer: '1' }, { instruction: 'Evaluate.', math: 'x' }] },
+        { label: 'B', watchFor: '', problems: [{ instruction: 'Evaluate the limit.', math: '\\lim_{x \\to 0} \\frac{\\sin x}{x}', answer: '1' }] },
+      ],
+    })
+    expect(sections.map((s) => s.label)).toEqual(['B'])
+    expect(sections[0].problems[0].verified).toBe(false)
   })
 })

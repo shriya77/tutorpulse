@@ -215,7 +215,21 @@ export function derivativeProblem(fnRaw: string): { prompt: string; answer: stri
     const fn = math.parse(node.toString().replace(/\bln\(/g, 'log('))
     const answer = math.simplify(math.derivative(fn, 'x')).toString({ implicit: 'show' }).replace(/\s+/g, '')
     if (!parseSafe(answer)) return null
-    return { prompt: `\\frac{d}{dx}\\left(${fn.toTex({ parenthesis: 'auto' })}\\right)`, answer }
+    return { prompt: `\\frac{d}{dx}\\left(${tightTex(fn.toTex({ parenthesis: 'auto' }))}\\right)`, answer }
+  } catch {
+    return null
+  }
+}
+
+/** mathjs writes implicit products as `5~x` (a visible space); drop it. */
+const tightTex = (tex: string) => tex.replace(/~/g, ' ')
+
+/** LaTeX for a safe plain-syntax expression (e.g. "-7/(x-3)^2"), or null. */
+export function expressionTex(raw: string): string | null {
+  const node = parseSafe(raw)
+  if (!node) return null
+  try {
+    return tightTex(math.parse(node.toString().replace(/\bln\(/g, 'log(')).toTex({ parenthesis: 'auto' }))
   } catch {
     return null
   }
