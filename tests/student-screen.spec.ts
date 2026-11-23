@@ -51,7 +51,7 @@ test('progress, pinned banner, and each student sees only their own results afte
     await expect(b.page.getByTestId('submit-status')).toHaveText(/Submitted ✓/, { timeout: 15_000 })
 
     // The tutor puts a topic up. A has scrolled down to the answer box: the banner stays in view.
-    await a.page.getByTestId('submit-answer').scrollIntoViewIfNeeded()
+    await a.page.getByTestId('answer-input').scrollIntoViewIfNeeded()
     const set = await post(tutor, '/_deepspace/agent/browser/tools/records_update', { input: { collection: 'sessions', recordId: sessionId, data: { focusLabel: 'Power rule exponent' } } })
     expect(JSON.stringify(set)).toMatch(/"success":\s*true/)
     const banner = a.page.getByTestId('focus-banner')

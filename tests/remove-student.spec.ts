@@ -16,17 +16,13 @@ test('a tutor removes a student, who cannot rejoin', async ({ users }) => {
     if (!tokens.has(u)) tokens.set(u, ((await (await u.context.request.post('/api/auth/token')).json()) as { token: string }).token)
     return tokens.get(u)!
   }
+  const userIdOf = async (u: MultiplayerUser) => (JSON.parse(Buffer.from((await tok(u)).split('.')[1], 'base64url').toString()) as { sub: string }).sub
   const post = async (u: MultiplayerUser, path: string, data: unknown) =>
     (await (await u.context.request.post(path, { headers: { Authorization: `Bearer ${await tok(u)}` }, data })).json()) as Record<string, any>
   const mySubs = async (u: MultiplayerUser, sessionId: string) => {
     const r = await post(u, '/_deepspace/agent/browser/tools/records_query', { input: { collection: 'submissions', where: { sessionId } } })
     return (r.result?.data?.records ?? r.result?.records ?? []) as unknown[]
   }
-
-  // A unique name to find B on the roster by.
-  await b.page.goto('/home')
-  const bName = `Removable ${Date.now() % 100000}`
-  expect((await post(b, '/api/actions/setDisplayName', { name: bName })).success).toBe(true)
 
   await tutor.page.goto('/home')
   await tutor.page.getByTestId('new-session-title').fill(`__test-${Date.now()}__ Remove student`)
@@ -57,7 +53,7 @@ test('a tutor removes a student, who cannot rejoin', async ({ users }) => {
     expect((await post(a, '/api/actions/removeStudent', { sessionId, studentId: 'anyone' })).success).toBe(false)
 
     // Remove B (the roster row whose name is B's).
-    const bRow = tutor.page.getByTestId('roster-row').filter({ hasText: bName })
+    const bRow = tutor.page.locator(`[data-testid="roster-row"][data-student-id="${await userIdOf(b)}"]`)
     await expect(bRow).toHaveCount(1)
     tutor.page.once('dialog', (d) => d.accept())
     await bRow.getByTestId('roster-remove').click()
@@ -74,6 +70,5 @@ test('a tutor removes a student, who cannot rejoin', async ({ users }) => {
     await expect(a.page.getByTestId('submit-status')).toHaveText(/Submitted ✓/)
   } finally {
     await post(tutor, '/api/actions/cleanupTestSession', { sessionId })
-    await post(b, '/api/actions/setDisplayName', { name: '' })
   }
 })

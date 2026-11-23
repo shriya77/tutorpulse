@@ -65,7 +65,8 @@ test('students opt in; the tutor sends each one their own recap once', async ({ 
     await expect(tutor.page.getByTestId('recap-result')).toHaveText('1 test account skipped', { timeout: 30_000 })
     await expect(tutor.page.getByTestId('send-recaps')).toHaveCount(0, { timeout: 15_000 }) // nobody left to email
     await expect(a.page.getByTestId('recap-sent')).toContainText('test account', { timeout: 15_000 })
-    await expect(b.page.getByTestId('recap-opt-in')).not.toBeChecked()
+    // Recaps have gone out, so B (who didn't ask) no longer gets a box that would never be acted on.
+    await expect(b.page.getByTestId('recap-opt-in')).toHaveCount(0, { timeout: 15_000 })
 
     const [row] = await rows(tutor, sessionId)
     expect(row.data.delivery).toBe('test_account')
