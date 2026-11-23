@@ -57,6 +57,12 @@ export function TutorView({ session }: { session: Envelope<SessionData> }) {
         {editing && session.data.status === 'open' && <TopicPicker session={session} />}
         {editing && session.data.status === 'open' && <NotesPanel sessionId={session.recordId} />}
       </section>
+      {/* On a phone the End button lives down here, away from the join code at the top. */}
+      {session.data.status === 'open' && (
+        <div className="border-t border-border pt-6 sm:hidden">
+          <EndSessionButton sessionId={session.recordId} className="w-full" />
+        </div>
+      )}
       {session.data.status === 'closed' && <ManageSession session={session} />}
     </div>
   )
@@ -89,16 +95,45 @@ function OpenSessionBar({ session, problemCount, missingKeys }: { session: Envel
   )
 }
 
-function LiveHeader({ session }: { session: Envelope<SessionData> }) {
+function EndSessionButton({ sessionId, className }: { sessionId: string; className?: string }) {
   const [busy, setBusy] = useState(false)
-  const joined = session.data.participantIds?.length ?? 0
-  const live = session.data.status === 'open'
   async function end() {
-    if (!window.confirm('End the session? Students can no longer join or submit.')) return
+    if (!window.confirm('End the session? Students can no longer join or submit. You can reopen it later.')) return
     setBusy(true)
-    await callAction('closeSession', { sessionId: session.recordId })
+    await callAction('closeSession', { sessionId })
     setBusy(false)
   }
+  return (
+    <Button variant="destructive" onClick={end} disabled={busy} className={className}>
+      End session
+    </Button>
+  )
+}
+
+function ReopenSessionButton({ sessionId }: { sessionId: string }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  async function reopen() {
+    if (!window.confirm('Reopen the session? Students can join and answer again with the join code.')) return
+    setBusy(true)
+    setError(null)
+    const r = await callAction('reopenSession', { sessionId })
+    setBusy(false)
+    if (!r.ok) setError(r.error)
+  }
+  return (
+    <div className="flex flex-col items-stretch gap-1 sm:items-end">
+      <Button variant="outline" onClick={reopen} disabled={busy} data-testid="reopen-session">
+        {busy ? 'Reopening…' : 'Reopen session'}
+      </Button>
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    </div>
+  )
+}
+
+function LiveHeader({ session }: { session: Envelope<SessionData> }) {
+  const joined = session.data.participantIds?.length ?? 0
+  const live = session.data.status === 'open'
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] p-5 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
@@ -110,9 +145,12 @@ function LiveHeader({ session }: { session: Envelope<SessionData> }) {
               {session.data.joinCode}
             </p>
           )}
-          <p className="mt-1 text-sm text-muted-foreground" data-testid="joined-count">
-            {joined} student{joined === 1 ? '' : 's'} joined
-          </p>
+          {/* While nobody has joined, the roster below already says so. */}
+          {(joined > 0 || !live) && (
+            <p className="mt-1 text-sm text-muted-foreground" data-testid="joined-count">
+              {joined} student{joined === 1 ? '' : 's'} joined
+            </p>
+          )}
         </div>
       </div>
       {live && (
@@ -124,11 +162,10 @@ function LiveHeader({ session }: { session: Envelope<SessionData> }) {
               <ClearBoardButton sessionId={session.recordId} />
             </div>
           )}
-          <Button variant="destructive" onClick={end} disabled={busy}>
-            End session
-          </Button>
+          <EndSessionButton sessionId={session.recordId} className="hidden sm:inline-flex" />
         </div>
       )}
+      {!live && <ReopenSessionButton sessionId={session.recordId} />}
     </div>
   )
 }
