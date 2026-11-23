@@ -18,6 +18,7 @@ import { ProblemEditor } from './ProblemEditor'
 import { JoinQr } from './JoinQr'
 import { NotesPanel } from './NotesPanel'
 import { PracticeSetPanel } from './PracticeSetPanel'
+import { RecapSender } from './RecapEmail'
 import { TopicPicker } from './TopicPicker'
 import { TutorRoster } from './TutorRoster'
 
@@ -43,6 +44,7 @@ export function TutorView({ session }: { session: Envelope<SessionData> }) {
     <div className="space-y-6">
       <LiveHeader session={session} />
       {session.data.status === 'closed' && <PracticeSetPanel session={session} />}
+      {session.data.status === 'closed' && <RecapSender sessionId={session.recordId} />}
       {session.data.status === 'open' && <TutorRoster session={session} problems={problems} />}
       <Board session={session} problems={problems} followUpProblems={followUpProblems} />
       <section className="space-y-3">

@@ -18,6 +18,7 @@ import { useWorkImage } from '../../hooks/useWorkImage'
 import { MathText } from '../MathText'
 import { HintPanel } from './HintPanel'
 import { PracticeSetLink } from './PracticeSetLink'
+import { RecapOptIn } from './RecapEmail'
 import { WorkPad, type WorkPadHandle } from './WorkPad'
 
 /** What a student shares with the tutor's live roster (F10). Ephemeral, never stored. */
@@ -60,6 +61,9 @@ export function StudentView({ session }: { session: Envelope<SessionData> }) {
         <p className="text-lg font-medium text-foreground">This session has ended.</p>
         <p className="mt-1 text-sm text-muted-foreground">Thanks for taking part.</p>
         <PracticeSetLink sessionId={session.recordId} />
+        <div className="mx-auto mt-5 w-fit max-w-full">
+          <RecapOptIn sessionId={session.recordId} />
+        </div>
       </div>
     )
   }
@@ -113,6 +117,7 @@ export function StudentView({ session }: { session: Envelope<SessionData> }) {
           {userId && <HintPanel userId={userId} />}
         </>
       )}
+      <RecapOptIn sessionId={session.recordId} />
     </div>
   )
 }

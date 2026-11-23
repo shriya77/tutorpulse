@@ -78,6 +78,15 @@ export type FollowUpData = {
   tutorIds: string[]
 }
 
+export type RecapRequestData = {
+  sessionId: string
+  studentId: string
+  tutorIds: string[]
+  wantsEmail: number
+  sentAt: string
+  delivery: string
+}
+
 export type PracticeSetStatus = 'generating' | 'ready' | 'published' | 'failed'
 
 export type PracticeSetData = {

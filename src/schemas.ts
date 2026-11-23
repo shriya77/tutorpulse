@@ -19,6 +19,7 @@ import { clustersSchema } from './schemas/clusters-schema'
 import { practiceSetsSchema } from './schemas/practice-sets-schema'
 import { sessionNotesSchema } from './schemas/session-notes-schema'
 import { followUpsSchema } from './schemas/follow-ups-schema'
+import { recapRequestsSchema } from './schemas/recap-requests-schema'
 
 import { aiChatSchemas } from './schemas/ai-chat-schema'
 
@@ -34,4 +35,5 @@ export const schemas: CollectionSchema[] = [
   practiceSetsSchema,
   sessionNotesSchema,
   followUpsSchema,
+  recapRequestsSchema,
 ]

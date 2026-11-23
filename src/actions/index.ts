@@ -13,6 +13,7 @@ import { addSessionNotes, refreshSessionNotes } from './notes-actions'
 import { submitAnswer } from './submit-answer'
 import { draftFollowUp, sendFollowUp } from './follow-up-actions'
 import { tutorHistory } from './history-actions'
+import { sendRecaps, setRecapEmail } from './recap-actions'
 
 export const actions: Record<string, ActionHandler<Env>> = {
   openSession,
@@ -26,4 +27,6 @@ export const actions: Record<string, ActionHandler<Env>> = {
   draftFollowUp,
   sendFollowUp,
   tutorHistory,
+  setRecapEmail,
+  sendRecaps,
 }

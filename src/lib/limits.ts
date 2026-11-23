@@ -20,3 +20,6 @@ export const MAX_WORK_IMAGES_PER_RUN = 12
 
 /** AI follow-up problem drafts per session (owner-billed). */
 export const MAX_FOLLOWUP_DRAFTS_PER_SESSION = 15
+
+/** Recap emails one tutor click may send (owner-billed, about 1 cent each). Each student gets at most one per session. */
+export const MAX_RECAP_EMAILS_PER_SEND = 60
