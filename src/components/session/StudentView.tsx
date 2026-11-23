@@ -6,7 +6,8 @@
  * enforces that, not this component (see tests/privacy.spec.ts).
  */
 
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth, usePresenceRoom, useQuery, useR2Files } from 'deepspace'
 import { Button, Input, Label } from '@/components/ui'
 import type { Envelope, FollowUpData, SessionData, SubmissionData } from '../../actions/types'
@@ -20,6 +21,7 @@ import { HintPanel } from './HintPanel'
 import { MyResults } from './MyResults'
 import { PracticeSetLink } from './PracticeSetLink'
 import { RecapOptIn } from './RecapEmail'
+import { TimerBadge } from './ProblemTimer'
 import { WorkPad, type WorkPadHandle } from './WorkPad'
 
 /** What a student shares with the tutor's live roster (F10). Ephemeral, never stored. */
@@ -66,10 +68,11 @@ export function StudentView({ session }: { session: Envelope<SessionData> }) {
         </div>
         <div className="rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] p-5">
           <MyResults sessionId={session.recordId} />
-          <div className="mt-5 border-t border-border pt-4">
-            <RecapOptIn sessionId={session.recordId} />
+          <div className="mt-5 border-t border-border pt-4 empty:hidden">
+            <RecapOptIn sessionId={session.recordId} recapsSent={!!session.data.recapsSentAt} />
           </div>
         </div>
+        <LeaveSession sessionId={session.recordId} ended />
       </div>
     )
   }
@@ -117,6 +120,7 @@ export function StudentView({ session }: { session: Envelope<SessionData> }) {
             number={index + 1}
             total={problems.length}
             focusLabel={session.data.focusLabel}
+            badge={<TimerBadge session={session} problemId={problem.recordId} />}
             prompt={problem.data.prompt}
             locked={problem.data.status === 'locked'}
             mine={mine}
@@ -134,14 +138,44 @@ export function StudentView({ session }: { session: Envelope<SessionData> }) {
           {userId && <HintPanel userId={userId} />}
         </>
       )}
-      <RecapOptIn sessionId={session.recordId} />
+      <RecapOptIn sessionId={session.recordId} recapsSent={!!session.data.recapsSentAt} />
+      <LeaveSession sessionId={session.recordId} ended={false} />
+    </div>
+  )
+}
+
+/** Leave the session: it drops off the student's home page. Answers so far stay with the tutor. */
+function LeaveSession({ sessionId, ended }: { sessionId: string; ended: boolean }) {
+  const navigate = useNavigate()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  async function leave() {
+    const msg = ended
+      ? 'Remove this session from your list? You won’t be able to open it or see your results again.'
+      : 'Leave this session? Your answers so far stay with your tutor, and you can rejoin with the code while it’s running.'
+    if (!window.confirm(msg)) return
+    setBusy(true)
+    setError(null)
+    const r = await callAction('leaveSession', { sessionId })
+    setBusy(false)
+    if (!r.ok) return setError(r.error)
+    navigate('/home', { replace: true })
+  }
+  return (
+    <div className="flex flex-col items-center gap-1 pt-2">
+      <button type="button" onClick={leave} disabled={busy} className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-50" data-testid="leave-session">
+        {busy ? 'Leaving…' : ended ? 'Remove from my list' : 'Leave session'}
+      </button>
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     </div>
   )
 }
 
 function AnswerCard({
-  problemId, number, total, focusLabel, heading, prompt, locked, mine, onSubmitted,
+  problemId, number, total, focusLabel, heading, prompt, locked, mine, onSubmitted, badge,
 }: {
+  /** Shown beside the heading (the tutor's countdown). */
+  badge?: ReactNode
   problemId: string
   number: number
   total: number
@@ -248,7 +282,10 @@ function AnswerCard({
 
   return (
     <form onSubmit={onSubmit} className="space-y-4 rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] p-5" aria-labelledby={`problem-heading-${problemId}`} data-testid={heading ? 'follow-up-card' : 'answer-card'}>
-      <h2 id={`problem-heading-${problemId}`} className={`text-sm font-medium ${heading ? 'text-primary' : 'text-muted-foreground'}`}>{title}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id={`problem-heading-${problemId}`} className={`text-sm font-medium ${heading ? 'text-primary' : 'text-muted-foreground'}`}>{title}</h2>
+        {badge}
+      </div>
       {/* Long expressions scroll sideways on phones; the edge fade hints that there is more. */}
       <div
         className="overflow-x-auto text-lg text-foreground sm:text-2xl [mask-image:linear-gradient(to_right,black_92%,transparent)] sm:[mask-image:none]"
@@ -262,11 +299,12 @@ function AnswerCard({
       <div className="grid gap-1.5">
         <span className="text-sm font-medium text-foreground">Show your working</span>
         <p className="-mt-1 text-xs text-muted-foreground">
-          Write your steps here, or take a photo of your paper. Only your tutor sees them, and it helps them spot where things went off track.
+          Write your steps, or photograph your paper. Only your tutor sees it.
         </p>
         {usePad ? (
           <WorkPad ref={pad} baseUrl={savedIsPhoto ? null : savedWorkUrl} disabled={locked || busy} onDirtyChange={setPadDirty} onInkChange={setPadInk} fullScreenHeading={
               <>
+                {badge && <div className="mb-1">{badge}</div>}
                 {focusLabel && (
                   <p className="mb-1 text-xs text-foreground" data-testid="fullscreen-focus">
                     <span className="font-semibold uppercase tracking-wide text-muted-foreground">Discussing </span>
@@ -351,9 +389,12 @@ function AnswerCard({
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" disabled={locked || busy || !answer.trim() || !!unchanged} data-testid="submit-answer">
-          {busy ? 'Saving…' : mine ? 'Update answer' : 'Submit'}
-        </Button>
+        {/* Once saved, the button only comes back when there's a change to send, instead of sitting greyed out. */}
+        {!(mine && unchanged && !locked) && (
+          <Button type="submit" disabled={locked || busy || !answer.trim()} data-testid="submit-answer">
+            {busy ? 'Saving…' : mine ? 'Update answer' : 'Submit'}
+          </Button>
+        )}
         <span aria-live="polite" className={`text-sm font-medium ${mine && !locked ? 'text-success' : 'text-muted-foreground'}`} data-testid="submit-status">
           {locked
             ? 'Answers are locked for this problem.'
@@ -361,6 +402,7 @@ function AnswerCard({
               ? `Submitted ✓${mine.data.revision > 1 ? ` (revision ${mine.data.revision})` : ''}`
               : ''}
         </span>
+        {mine && unchanged && !locked && <span className="text-xs text-muted-foreground" data-testid="saved-hint">Change your answer or working to update it.</span>}
       </div>
     </form>
   )

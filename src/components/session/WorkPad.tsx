@@ -24,7 +24,7 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowDownToLine, Eraser, Hand, Maximize2, Minimize2, Pen, Trash2, Undo2, ZoomIn, ZoomOut } from 'lucide-react'
+import { ArrowDownToLine, Eraser, Hand, HelpCircle, Maximize2, Minimize2, Pen, Trash2, Undo2, ZoomIn, ZoomOut } from 'lucide-react'
 import { Button } from '@/components/ui'
 
 /** The inline pad's shape (height / width), and the page's starting height. */
@@ -554,7 +554,14 @@ export const WorkPad = forwardRef<WorkPadHandle, Props>(function WorkPad({ baseU
         <div ref={wrapRef} className="overflow-hidden rounded-xl border border-input bg-muted/60">
           {canvas}
         </div>
-        <p className="text-xs text-muted-foreground">{hint}</p>
+        {/* On a phone the tips fold behind a "?" so they don't take three lines under every problem. */}
+        <p className="hidden text-xs text-muted-foreground sm:block">{hint}</p>
+        <details className="text-xs text-muted-foreground sm:hidden" data-testid="work-pad-tips">
+          <summary className="flex w-fit cursor-pointer list-none items-center gap-1.5 rounded-full py-0.5 [&::-webkit-details-marker]:hidden">
+            <HelpCircle aria-hidden className="size-4" /> Zoom and move tips
+          </summary>
+          <p className="mt-1">{hint}</p>
+        </details>
       </div>
     )
   }

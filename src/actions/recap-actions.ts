@@ -139,5 +139,6 @@ export const sendRecaps: ActionHandler<Env> = async (ctx) => {
     }
     await ctx.tools.update('recapRequests', r.recordId, { sentAt: new Date().toISOString(), delivery })
   }
+  if (sent + testAccounts > 0) await ctx.tools.update('sessions', session.recordId, { recapsSentAt: new Date().toISOString() })
   return { success: true, data: { sent, testAccounts, failed } }
 }

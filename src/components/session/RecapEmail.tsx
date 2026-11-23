@@ -13,7 +13,7 @@ import { Button } from '@/components/ui'
 import type { RecapRequestData } from '../../actions/types'
 import { callAction } from '../../lib/callAction'
 
-export function RecapOptIn({ sessionId }: { sessionId: string }) {
+export function RecapOptIn({ sessionId, recapsSent = false }: { sessionId: string; recapsSent?: boolean }) {
   const { records, status } = useQuery<RecapRequestData>('recapRequests', { where: { sessionId } })
   const mine = records[0]
   const [busy, setBusy] = useState(false)
@@ -29,6 +29,8 @@ export function RecapOptIn({ sessionId }: { sessionId: string }) {
       </p>
     )
   }
+  // The tutor has already sent this session's recaps, so a new tick would never be acted on.
+  if (recapsSent) return null
   const checked = optimistic ?? mine?.data.wantsEmail === 1
 
   async function toggle(next: boolean) {

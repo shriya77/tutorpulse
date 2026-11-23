@@ -1,5 +1,5 @@
 /**
- * Session lifecycle actions: open (F2), join (F4), close, reopen.
+ * Session lifecycle actions: open (F2), join (F4), close, reopen, leave.
  * Every action starts with a guard from ./guards and scopes all reads to the
  * session it returned.
  */
@@ -7,7 +7,7 @@
 import type { ActionHandler, ActionTools } from 'deepspace/worker'
 import type { Env } from '../../worker'
 import { generateJoinCode, normalizeJoinCode } from '../lib/joinCode'
-import { requireTutor } from './guards'
+import { requireParticipant, requireTutor } from './guards'
 import type { Envelope, ProblemData, SessionData } from './types'
 
 /** A join code no open session is using: `keep` if it's still free, else a new one. */
@@ -119,4 +119,24 @@ export const joinSession: ActionHandler<Env> = async (ctx) => {
     await ctx.tools.update('sessions', session.recordId, { participantIds: [...current, ctx.userId] })
   }
   return { success: false, error: 'Too many people joined at once, please try again' }
+}
+
+/**
+ * A student leaves a session: they're taken off `participantIds`, so it drops
+ * off their home page and they can no longer open it. Their answers so far
+ * stay with the tutor. Unlike `removeStudent`, they can rejoin with the code
+ * while it's live. `participantIds` is replaced whole, so re-read and retry.
+ */
+export const leaveSession: ActionHandler<Env> = async (ctx) => {
+  const g = await requireParticipant(ctx, ctx.params.sessionId)
+  if (!g.ok) return { success: false, error: g.error }
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const fresh = await ctx.tools.get('sessions', g.session.recordId)
+    if (!fresh.success) return { success: false, error: 'Could not leave the session' }
+    const current = (fresh.data.record.data as SessionData).participantIds
+    const ids = Array.isArray(current) ? current : []
+    if (!ids.includes(ctx.userId)) return { success: true, data: { left: true } }
+    await ctx.tools.update('sessions', g.session.recordId, { participantIds: ids.filter((id) => id !== ctx.userId) })
+  }
+  return { success: false, error: 'Could not leave the session, try again' }
 }
