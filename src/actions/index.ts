@@ -16,6 +16,7 @@ import { tutorHistory } from './history-actions'
 import { myResults, sendRecaps, setRecapEmail } from './recap-actions'
 import { sessionDisplayNames, setDisplayName } from './profile-actions'
 import { cleanupTestSession, deleteSession } from './delete-session'
+import { duplicateSession } from './duplicate-session'
 
 export const actions: Record<string, ActionHandler<Env>> = {
   openSession,
@@ -35,5 +36,6 @@ export const actions: Record<string, ActionHandler<Env>> = {
   setDisplayName,
   sessionDisplayNames,
   deleteSession,
+  duplicateSession,
   cleanupTestSession,
 }
