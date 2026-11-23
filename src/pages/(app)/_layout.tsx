@@ -20,6 +20,7 @@ import { Outlet } from 'react-router-dom'
 import { DeepSpaceAuthProvider, useAuthStatus } from 'deepspace'
 import { RecordProvider, RecordScope, AgentTools } from 'deepspace'
 import Navigation from '../../components/Navigation'
+import { ConnectionBanner } from '../../components/ConnectionBanner'
 import { useToast } from '@/components/ui'
 import { APP_NAME, SCOPE_ID } from '../../constants'
 import { schemas } from '../../schemas'
@@ -33,6 +34,7 @@ export default function AppLayout() {
       <AuthBoot>
         <div className="flex h-screen flex-col bg-background overflow-hidden">
           <Navigation />
+          <ConnectionBanner />
           {/* `relative`: absolutely positioned descendants (e.g. sr-only text and inputs)
               stay inside this scroller instead of stretching the page below the screen. */}
           <main className="paper-grid relative flex-1 overflow-y-auto min-h-0">
