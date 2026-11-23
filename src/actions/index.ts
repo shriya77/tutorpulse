@@ -18,6 +18,7 @@ import { sessionDisplayNames, setDisplayName } from './profile-actions'
 import { cleanupTestSession, deleteSession } from './delete-session'
 import { duplicateSession } from './duplicate-session'
 import { removeStudent } from './remove-student'
+import { ensureSessionAccess } from './session-team'
 
 export const actions: Record<string, ActionHandler<Env>> = {
   openSession,
@@ -41,5 +42,6 @@ export const actions: Record<string, ActionHandler<Env>> = {
   deleteSession,
   duplicateSession,
   removeStudent,
+  ensureSessionAccess,
   cleanupTestSession,
 }

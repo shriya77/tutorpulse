@@ -2,9 +2,10 @@ import type { CollectionSchema } from 'deepspace/schema'
 import { ADMIN_ALL, DENY_ALL } from './permissions'
 
 /**
- * One problem in a session. Readable by every signed-in member (prompts are
- * not sensitive; see REQUIREMENTS "Why it's shaped this way"). The correct
- * answer is NOT here — it lives in `answerKeys`.
+ * One problem in a session. Readable only by its creator (the tutor) and the
+ * session's students: `'team'` read with `teamField: 'sessionId'`, where
+ * `team_members` (written by the join / leave / remove actions) says who is
+ * in each session. The correct answer is NOT here — it lives in `answerKeys`.
  *
  * Because any member can create a problem row, a row's `sessionId` alone is
  * not proof it belongs to that session: server code and the UI only trust a
@@ -41,11 +42,12 @@ export const problemsSchema: CollectionSchema = {
     /** Server-only: the problem a follow-up checks. */
     { name: 'parentProblemId', storage: 'text', interpretation: 'plain', default: '' },
   ],
+  teamField: 'sessionId',
   permissions: {
     '*': DENY_ALL,
     viewer: DENY_ALL,
     member: {
-      read: true,
+      read: 'team',
       create: true,
       update: 'own',
       delete: 'own',

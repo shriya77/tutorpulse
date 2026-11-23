@@ -19,6 +19,10 @@ test('a tutor removes a student, who cannot rejoin', async ({ users }) => {
   const userIdOf = async (u: MultiplayerUser) => (JSON.parse(Buffer.from((await tok(u)).split('.')[1], 'base64url').toString()) as { sub: string }).sub
   const post = async (u: MultiplayerUser, path: string, data: unknown) =>
     (await (await u.context.request.post(path, { headers: { Authorization: `Bearer ${await tok(u)}` }, data })).json()) as Record<string, any>
+  const problemsSeen = async (u: MultiplayerUser, sessionId: string) => {
+    const r = await post(u, '/_deepspace/agent/browser/tools/records_query', { input: { collection: 'problems', where: { sessionId } } })
+    return ((r.result?.data?.records ?? r.result?.records ?? []) as unknown[]).length
+  }
   const mySubs = async (u: MultiplayerUser, sessionId: string) => {
     const r = await post(u, '/_deepspace/agent/browser/tools/records_query', { input: { collection: 'submissions', where: { sessionId } } })
     return (r.result?.data?.records ?? r.result?.records ?? []) as unknown[]
@@ -36,6 +40,9 @@ test('a tutor removes a student, who cannot rejoin', async ({ users }) => {
     await expect(tutor.page.getByTestId('problem-row')).toHaveCount(1, { timeout: 15_000 })
     await tutor.page.getByTestId('open-session').click()
     const code = (await tutor.page.getByTestId('join-code').textContent({ timeout: 15_000 }))!.trim()
+    // Problems are only for the session's people: B can't read them before joining.
+    expect(await problemsSeen(b, sessionId)).toBe(0)
+    expect(await problemsSeen(tutor, sessionId)).toBe(1)
     for (const s of [a, b]) {
       await s.page.goto('/home')
       await s.page.getByTestId('join-code-input').fill(code)
@@ -65,6 +72,8 @@ test('a tutor removes a student, who cannot rejoin', async ({ users }) => {
     await expect(b.page.getByText('Session not found')).toBeVisible({ timeout: 20_000 })
     expect(await mySubs(b, sessionId)).toHaveLength(0)
     expect(await post(b, '/api/actions/joinSession', { joinCode: code })).toEqual({ success: false, error: 'Your tutor removed you from this session' })
+    expect(await problemsSeen(b, sessionId)).toBe(0) // nor after being removed
+    expect(await problemsSeen(a, sessionId)).toBe(1)
     // A is unaffected.
     expect(await mySubs(a, sessionId)).toHaveLength(1)
     await expect(a.page.getByTestId('submit-status')).toHaveText(/Submitted ✓/)

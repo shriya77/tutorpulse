@@ -65,6 +65,7 @@ async function deleteSessionData(env: Env, tools: ActionTools, tutorId: string, 
   for (const collection of ['submissions', 'clusters', 'followUps', 'recapRequests', 'practiceSets', 'sessionNotes', 'problems']) {
     records += await deleteAll(tools, collection, { sessionId })
   }
+  records += await deleteAll(tools, 'team_members', { TeamId: sessionId })
   const removed = await tools.remove('sessions', sessionId)
   return { ok: removed.success, records: records + 1, files }
 }

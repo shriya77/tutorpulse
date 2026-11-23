@@ -55,6 +55,12 @@ export function StudentView({ session }: { session: Envelope<SessionData> }) {
     if (connected) updateState({ ...presence })
   }, [connected, presence.problemId, presence.submitted, presence.stuck])
 
+  // Make sure we're in the session's team (what lets us read its problems). Joining
+  // already does this; this fills it in for anyone who joined before teams existed.
+  useEffect(() => {
+    void callAction('ensureSessionAccess', { sessionId: session.recordId })
+  }, [session.recordId])
+
   // A new problem starts un-stuck.
   useEffect(() => setStuck(false), [problem?.recordId])
 

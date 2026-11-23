@@ -8,6 +8,7 @@ import type { ActionHandler, ActionTools } from 'deepspace/worker'
 import type { Env } from '../../worker'
 import { generateJoinCode, normalizeJoinCode } from '../lib/joinCode'
 import { requireParticipant, requireTutor } from './guards'
+import { joinSessionTeam, leaveSessionTeam } from './session-team'
 import type { Envelope, ProblemData, SessionData } from './types'
 
 /** A join code no open session is using: `keep` if it's still free, else a new one. */
@@ -114,6 +115,8 @@ export const joinSession: ActionHandler<Env> = async (ctx) => {
     }
     const current = Array.isArray(data.participantIds) ? data.participantIds : []
     if (current.includes(ctx.userId)) {
+      // In the session's team too, so they can read its problems.
+      if (!(await joinSessionTeam(ctx.tools, session.recordId, ctx.userId))) return { success: false, error: 'Could not join, please try again' }
       return { success: true, data: { sessionId: session.recordId, role: 'student' } }
     }
     await ctx.tools.update('sessions', session.recordId, { participantIds: [...current, ctx.userId] })
@@ -135,7 +138,10 @@ export const leaveSession: ActionHandler<Env> = async (ctx) => {
     if (!fresh.success) return { success: false, error: 'Could not leave the session' }
     const current = (fresh.data.record.data as SessionData).participantIds
     const ids = Array.isArray(current) ? current : []
-    if (!ids.includes(ctx.userId)) return { success: true, data: { left: true } }
+    if (!ids.includes(ctx.userId)) {
+      await leaveSessionTeam(ctx.tools, g.session.recordId, ctx.userId)
+      return { success: true, data: { left: true } }
+    }
     await ctx.tools.update('sessions', g.session.recordId, { participantIds: ids.filter((id) => id !== ctx.userId) })
   }
   return { success: false, error: 'Could not leave the session, try again' }
