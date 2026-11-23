@@ -10,11 +10,13 @@ import { getAuthToken } from 'deepspace'
 
 export function useWorkImage(submissionId: string | undefined, hasWork: boolean, revision = 0) {
   const [url, setUrl] = useState<string | null>(null)
+  const [type, setType] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     if (!submissionId || !hasWork) {
       setUrl(null)
+      setType(null)
       return
     }
     let cancelled = false
@@ -32,6 +34,7 @@ export function useWorkImage(submissionId: string | undefined, hasWork: boolean,
         if (cancelled) return
         objectUrl = URL.createObjectURL(blob)
         setUrl(objectUrl)
+        setType(blob.type)
       } catch {
         if (!cancelled) setFailed(true)
       }
@@ -42,5 +45,6 @@ export function useWorkImage(submissionId: string | undefined, hasWork: boolean,
     }
   }, [submissionId, hasWork, revision])
 
-  return { url, failed }
+  /** `type` is image/png for a pad drawing, image/jpeg for a photo of paper. */
+  return { url, type, failed }
 }

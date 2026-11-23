@@ -28,7 +28,7 @@ import type { ClusterJobPayload } from '../actions/clustering-trigger'
 import { buildClusterPrompt, buildRetryNote, CLUSTER_INSTRUCTIONS } from '../ai/prompts/cluster'
 import { clusterOutputSchema, fallbackClusters, validateClusters, type ValidCluster } from '../lib/clusters'
 import { MAX_CLUSTER_RUNS_PER_SESSION, MAX_WORK_BYTES, MAX_WORK_IMAGES_PER_RUN } from '../lib/limits'
-import { isPngBytes } from '../lib/work'
+import { workImageType } from '../lib/work'
 import { misconceptionsFor } from '../ai/misconceptions/math2413'
 
 export const CLUSTER_MODEL = 'claude-haiku-5-5'
@@ -90,7 +90,7 @@ export async function runClusterJob(payload: ClusterJobPayload, ctx: JobContext,
         ctx.progress(0.3, 'Grouping wrong answers')
         const ai = createDeepSpaceAI(env, 'anthropic') // owner-billed: no authToken
         const library = misconceptionsFor(session.data.topic)
-        const work = payload.noImages ? new Map<string, Uint8Array>() : await loadWorkImages(env, wrong)
+        const work = payload.noImages ? new Map<string, WorkImage>() : await loadWorkImages(env, wrong)
         images = work.size
         const baseInput = {
           problemPrompt: problem.data.prompt,
@@ -109,9 +109,9 @@ export async function runClusterJob(payload: ClusterJobPayload, ctx: JobContext,
           const text = buildClusterPrompt(withLibrary ? { ...baseInput, topicMisconceptions: library } : baseInput)
           if (work.size === 0) return text
           const parts: Exclude<UserContent, string> = [{ type: 'text', text }]
-          for (const [id, bytes] of work) {
+          for (const [id, { bytes, mediaType }] of work) {
             parts.push({ type: 'text', text: `Handwritten working for submission ${id}:` })
-            parts.push({ type: 'image', image: bytes, mediaType: 'image/png' })
+            parts.push({ type: 'image', image: bytes, mediaType })
           }
           return parts
         }
@@ -184,8 +184,10 @@ export async function runClusterJob(payload: ClusterJobPayload, ctx: JobContext,
  * small PNG. A missing or bad file just means that student is grouped from
  * their typed answer, as before.
  */
-async function loadWorkImages(env: Env, wrong: Envelope<SubmissionData>[]): Promise<Map<string, Uint8Array>> {
-  const out = new Map<string, Uint8Array>()
+type WorkImage = { bytes: Uint8Array; mediaType: 'image/png' | 'image/jpeg' }
+
+async function loadWorkImages(env: Env, wrong: Envelope<SubmissionData>[]): Promise<Map<string, WorkImage>> {
+  const out = new Map<string, WorkImage>()
   const withWork = wrong
     .filter((s) => s.data.workKey)
     .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
@@ -195,7 +197,8 @@ async function loadWorkImages(env: Env, wrong: Envelope<SubmissionData>[]): Prom
       try {
         const res = await appFiles(env, { scope: 'self', userId: s.data.studentId }).download(s.data.workKey!)
         const bytes = new Uint8Array(await res.arrayBuffer())
-        if (bytes.byteLength <= MAX_WORK_BYTES && isPngBytes(bytes)) out.set(s.recordId, bytes)
+        const mediaType = workImageType(bytes)
+        if (bytes.byteLength <= MAX_WORK_BYTES && mediaType) out.set(s.recordId, { bytes, mediaType })
       } catch {
         // grouped from the typed answer only
       }

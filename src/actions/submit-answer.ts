@@ -10,7 +10,8 @@
  *
  * Optional `workKey`: the student's handwritten working, already uploaded to
  * THEIR private folder. It is re-read from the caller's own folder (a key in
- * anyone else's folder is refused by appFiles) and must be a small PNG, so a
+ * anyone else's folder is refused by appFiles) and must be a small PNG drawing
+ * or an EXIF-free JPEG photo (see src/lib/work.ts), so a
  * student can never point their submission at someone else's file.
  *
  * The student is told only that the answer was saved, not whether it was
@@ -23,7 +24,7 @@ import type { ActionHandler } from 'deepspace/worker'
 import type { Env } from '../../worker'
 import { checkAnswer, type Verdict } from '../lib/answerCheck'
 import { MAX_WORK_BYTES } from '../lib/limits'
-import { isPngBytes } from '../lib/work'
+import { workImageType } from '../lib/work'
 import { requestClustering } from './clustering-trigger'
 import { loadSessionProblem, PROBLEM_NOT_FOUND, requireParticipant } from './guards'
 import type { AnswerKeyData, Envelope, SubmissionData } from './types'
@@ -107,7 +108,7 @@ async function readOwnWork(env: Env, userId: string, key: string): Promise<{ ok:
     const res = await appFiles(env, { scope: 'self', userId }).download(key)
     const bytes = new Uint8Array(await res.arrayBuffer())
     if (bytes.byteLength > MAX_WORK_BYTES) return { ok: false, error: 'Your working image is too large' }
-    if (!isPngBytes(bytes)) return { ok: false, error: 'Your working must be a drawing from the pad' }
+    if (!workImageType(bytes)) return { ok: false, error: 'Your working must be a drawing or photo from the app' }
     return { ok: true }
   } catch {
     return { ok: false, error: 'Could not read your working' }

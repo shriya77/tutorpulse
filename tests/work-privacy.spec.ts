@@ -114,7 +114,7 @@ test('T8: handwritten working is visible only to the student and their tutor', a
     const textKey = await uploadOwn(b, `work/${problemId}.png`, Buffer.from('<svg onload=alert(1)>'), 'image/png')
     expect(await action(b, 'submitAnswer', { problemId, answer: '2x', workKey: textKey })).toEqual({
       success: false,
-      error: 'Your working must be a drawing from the pad',
+      error: 'Your working must be a drawing or photo from the app',
     })
 
     // ── Positive control: B's own PNG is accepted and shown to the tutor ───

@@ -12,7 +12,8 @@ import { Button, Input, Label } from '@/components/ui'
 import type { Envelope, FollowUpData, SessionData, SubmissionData } from '../../actions/types'
 import { useFollowUps, useSessionProblems } from '../../hooks/useSessionData'
 import { callAction } from '../../lib/callAction'
-import { workRelativeKey } from '../../lib/work'
+import { workPhotoRelativeKey, workRelativeKey } from '../../lib/work'
+import { MAX_WORK_BYTES } from '../../lib/limits'
 import { useWorkImage } from '../../hooks/useWorkImage'
 import { MathText } from '../MathText'
 import { HintPanel } from './HintPanel'
@@ -138,7 +139,36 @@ function AnswerCard({
   const pad = useRef<WorkPadHandle>(null)
   const { upload } = useR2Files() // private 'self' folder: only this student (and the checked route) can read it
   // The saved working, so a revision continues from it. Fetched once per submission row.
-  const { url: savedWorkUrl } = useWorkImage(mine?.recordId, !!mine?.data.workKey)
+  const { url: savedWorkUrl, type: savedWorkType } = useWorkImage(mine?.recordId, !!mine?.data.workKey)
+  const savedIsPhoto = savedWorkType === 'image/jpeg'
+  // A photo of paper working, as an alternative to the pad.
+  const [photo, setPhoto] = useState<{ blob: Blob; url: string } | null>(null)
+  const [photoDirty, setPhotoDirty] = useState(false)
+  const [usePad, setUsePad] = useState(true)
+  const [photoError, setPhotoError] = useState<string | null>(null)
+  useEffect(() => {
+    if (savedIsPhoto && !photoDirty) setUsePad(false)
+  }, [savedIsPhoto])
+  useEffect(() => () => { if (photo) URL.revokeObjectURL(photo.url) }, [photo])
+  const photoUrl = photo?.url ?? (savedIsPhoto && !photoDirty ? savedWorkUrl : null)
+
+  async function onPhotoPicked(file: File | undefined) {
+    if (!file) return
+    setPhotoError(null)
+    try {
+      const blob = await shrinkPhoto(file)
+      setPhoto({ blob, url: URL.createObjectURL(blob) })
+      setPhotoDirty(true)
+      setUsePad(false)
+    } catch {
+      setPhotoError('Could not read that photo, try another')
+    }
+  }
+  function removePhoto() {
+    setPhoto(null)
+    setPhotoDirty(true)
+    setUsePad(true)
+  }
 
   // Prefill with the saved answer once it arrives, so revising starts from it.
   useEffect(() => {
@@ -151,11 +181,11 @@ function AnswerCard({
   // With written working the one-line explanation is redundant (the tutor and the
   // grouping read the working), so it only shows when the pad is empty, or when it
   // already holds text that would still be sent.
-  const hasWorking = padInk || (!padDirty && !!mine?.data.workKey)
+  const hasWorking = usePad ? padInk || (!padDirty && !photoDirty && !!mine?.data.workKey && !savedIsPhoto) : !!photoUrl
   const showExplanation = !hasWorking || explanation.trim() !== '' || typedExplanation
 
   const unchanged =
-    mine && !padDirty && mine.data.answer === answer.trim() && (mine.data.explanation ?? '') === explanation.trim()
+    mine && !padDirty && !photoDirty && mine.data.answer === answer.trim() && (mine.data.explanation ?? '') === explanation.trim()
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -165,8 +195,12 @@ function AnswerCard({
       // Untouched pad: keep the working already saved. Otherwise upload the new drawing
       // (same key per problem, so it replaces the old one), or none if it was cleared.
       let workKey = mine?.data.workKey ?? ''
-      if (pad.current?.dirty) {
-        const png = await pad.current.exportPng()
+      if (!usePad && photo) {
+        const up = await upload(photo.blob, 'working.jpg', { key: workPhotoRelativeKey(problemId) })
+        if (!up.success || !up.key) throw new Error(up.error || 'Could not save your photo')
+        workKey = up.key
+      } else if (usePad && (pad.current?.dirty || photoDirty)) {
+        const png = (await pad.current?.exportPng()) ?? null
         workKey = ''
         if (png) {
           const up = await upload(png, 'working.png', { key: workRelativeKey(problemId) })
@@ -177,6 +211,7 @@ function AnswerCard({
       const r = await callAction<{ revision: number }>('submitAnswer', { problemId, answer, explanation, workKey })
       if (!r.ok) throw new Error(r.error)
       pad.current?.markSaved()
+      setPhotoDirty(false)
       onSubmitted()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save your answer')
@@ -201,9 +236,41 @@ function AnswerCard({
       <div className="grid gap-1.5">
         <span className="text-sm font-medium text-foreground">Show your working</span>
         <p className="-mt-1 text-xs text-muted-foreground">
-          Write your steps here. Only your tutor sees them, and it helps them spot where things went off track.
+          Write your steps here, or take a photo of your paper. Only your tutor sees them, and it helps them spot where things went off track.
         </p>
-        <WorkPad ref={pad} baseUrl={savedWorkUrl} disabled={locked || busy} onDirtyChange={setPadDirty} onInkChange={setPadInk} />
+        {usePad ? (
+          <WorkPad ref={pad} baseUrl={savedIsPhoto ? null : savedWorkUrl} disabled={locked || busy} onDirtyChange={setPadDirty} onInkChange={setPadInk} />
+        ) : (
+          photoUrl && (
+            <div className="overflow-hidden rounded-xl border border-input bg-white">
+              <img src={photoUrl} alt="Photo of your working" className="mx-auto max-h-96 w-auto" data-testid="work-photo" />
+            </div>
+          )
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {usePad ? (
+            <label className={`inline-flex cursor-pointer items-center rounded-lg border border-input px-3 py-1.5 text-sm text-foreground hover:bg-secondary ${locked || busy ? 'pointer-events-none opacity-50' : ''}`}>
+              Use a photo of paper instead
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="sr-only"
+                disabled={locked || busy}
+                onChange={(e) => {
+                  void onPhotoPicked(e.target.files?.[0])
+                  e.target.value = ''
+                }}
+                data-testid="work-photo-input"
+              />
+            </label>
+          ) : (
+            <Button type="button" size="sm" variant="outline" onClick={removePhoto} disabled={locked || busy} data-testid="work-photo-remove">
+              Remove photo and use the pad
+            </Button>
+          )}
+          {photoError && <span role="alert" className="text-sm text-destructive">{photoError}</span>}
+        </div>
       </div>
 
       <div className="grid gap-1.5">
@@ -258,4 +325,27 @@ function AnswerCard({
       </div>
     </form>
   )
+}
+
+/**
+ * Shrink a phone photo and re-encode it as JPEG on the student's own device.
+ * Re-encoding drops the EXIF block (camera details and GPS location), and the
+ * server refuses any JPEG that still has one (src/lib/work.ts).
+ */
+async function shrinkPhoto(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  const scale = Math.min(1, 1400 / Math.max(bitmap.width, bitmap.height))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(bitmap.width * scale)
+  canvas.height = Math.round(bitmap.height * scale)
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  bitmap.close()
+  for (const quality of [0.82, 0.7, 0.55, 0.4]) {
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
+    if (blob && blob.size <= MAX_WORK_BYTES) return blob
+  }
+  throw new Error('Photo too large')
 }

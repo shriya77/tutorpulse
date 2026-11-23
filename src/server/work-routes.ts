@@ -7,6 +7,7 @@
  * other students included, gets 404 with no hint whether the row exists.
  */
 
+import { workImageType } from '../lib/work'
 import type { Hono } from 'hono'
 import { appFiles } from 'deepspace/worker'
 import type { VerifyResult } from 'deepspace/worker'
@@ -30,9 +31,13 @@ export function registerWorkRoutes(app: Hono<AppContext>, resolveAuth: ResolveAu
     if (!sub || !canViewWork(sub, auth.userId)) return c.json({ error: 'Not found' }, 404)
     try {
       const file = await appFiles(c.env, { scope: 'self', userId: sub.studentId }).download(sub.workKey!)
-      return new Response(file.body, {
+      // Serve only what submitAnswer accepted: a PNG drawing or an EXIF-free JPEG photo.
+      const bytes = new Uint8Array(await file.arrayBuffer())
+      const type = workImageType(bytes)
+      if (!type) return c.json({ error: 'Not found' }, 404)
+      return new Response(bytes, {
         headers: {
-          'Content-Type': 'image/png',
+          'Content-Type': type,
           'Cache-Control': 'private, no-store',
           'X-Content-Type-Options': 'nosniff',
           'Content-Security-Policy': "default-src 'none'",
