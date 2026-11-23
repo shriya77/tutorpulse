@@ -17,6 +17,7 @@ import { MAX_WORK_BYTES } from '../../lib/limits'
 import { useWorkImage } from '../../hooks/useWorkImage'
 import { MathText } from '../MathText'
 import { HintPanel } from './HintPanel'
+import { MyResults } from './MyResults'
 import { PracticeSetLink } from './PracticeSetLink'
 import { RecapOptIn } from './RecapEmail'
 import { WorkPad, type WorkPadHandle } from './WorkPad'
@@ -57,12 +58,17 @@ export function StudentView({ session }: { session: Envelope<SessionData> }) {
 
   if (session.data.status === 'closed') {
     return (
-      <div className="rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] p-6 text-center">
-        <p className="text-lg font-medium text-foreground">This session has ended.</p>
-        <p className="mt-1 text-sm text-muted-foreground">Thanks for taking part.</p>
-        <PracticeSetLink sessionId={session.recordId} />
-        <div className="mx-auto mt-5 w-fit max-w-full">
-          <RecapOptIn sessionId={session.recordId} />
+      <div className="space-y-5">
+        <div className="rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] p-6 text-center">
+          <p className="text-lg font-medium text-foreground">This session has ended.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Thanks for taking part.</p>
+          <PracticeSetLink sessionId={session.recordId} />
+        </div>
+        <div className="rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] p-5">
+          <MyResults sessionId={session.recordId} />
+          <div className="mt-5 border-t border-border pt-4">
+            <RecapOptIn sessionId={session.recordId} />
+          </div>
         </div>
       </div>
     )
@@ -71,9 +77,16 @@ export function StudentView({ session }: { session: Envelope<SessionData> }) {
   return (
     <div className="space-y-5">
       {session.data.focusLabel && (
-        <div role="status" className="rounded-2xl border-2 border-highlight bg-accent px-5 py-4 text-foreground" data-testid="focus-banner">
-          <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Discussing </span>
-          <span className="hl font-display text-xl font-semibold">{session.data.focusLabel}</span>
+        // Pinned to the top of the scroller so a student working further down the
+        // page still sees it; it flashes once whenever the tutor changes it.
+        <div
+          key={session.data.focusLabel}
+          role="status"
+          className="banner-flash sticky top-2 z-20 rounded-2xl border-2 border-highlight bg-accent px-4 py-2.5 text-foreground shadow-md sm:px-5 sm:py-3"
+          data-testid="focus-banner"
+        >
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:text-sm">Discussing </span>
+          <span className="hl font-display text-lg font-semibold sm:text-xl">{session.data.focusLabel}</span>
         </div>
       )}
       {followUp && (
@@ -81,6 +94,8 @@ export function StudentView({ session }: { session: Envelope<SessionData> }) {
           key={followUp.recordId}
           problemId={followUp.recordId}
           number={0}
+          total={0}
+          focusLabel={session.data.focusLabel}
           heading="Quick check from your tutor"
           prompt={followUp.data.prompt}
           locked={false}
@@ -100,6 +115,8 @@ export function StudentView({ session }: { session: Envelope<SessionData> }) {
             key={problem.recordId}
             problemId={problem.recordId}
             number={index + 1}
+            total={problems.length}
+            focusLabel={session.data.focusLabel}
             prompt={problem.data.prompt}
             locked={problem.data.status === 'locked'}
             mine={mine}
@@ -123,10 +140,13 @@ export function StudentView({ session }: { session: Envelope<SessionData> }) {
 }
 
 function AnswerCard({
-  problemId, number, heading, prompt, locked, mine, onSubmitted,
+  problemId, number, total, focusLabel, heading, prompt, locked, mine, onSubmitted,
 }: {
   problemId: string
   number: number
+  total: number
+  /** What the tutor is discussing, repeated in the full-screen pad (the page banner is hidden there). */
+  focusLabel?: string
   /** Replaces "Problem N" (used for a follow-up check). */
   heading?: string
   prompt: string
@@ -142,6 +162,7 @@ function AnswerCard({
   const [padInk, setPadInk] = useState(false)
   const [typedExplanation, setTypedExplanation] = useState(false) // keeps the box from vanishing mid-edit
   const pad = useRef<WorkPadHandle>(null)
+  const title = heading ?? `Problem ${number} of ${total}`
   const { upload } = useR2Files() // private 'self' folder: only this student (and the checked route) can read it
   // The saved working, so a revision continues from it. Fetched once per submission row.
   const { url: savedWorkUrl, type: savedWorkType } = useWorkImage(mine?.recordId, !!mine?.data.workKey)
@@ -227,13 +248,13 @@ function AnswerCard({
 
   return (
     <form onSubmit={onSubmit} className="space-y-4 rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] p-5" aria-labelledby={`problem-heading-${problemId}`} data-testid={heading ? 'follow-up-card' : 'answer-card'}>
-      <h2 id={`problem-heading-${problemId}`} className={`text-sm font-medium ${heading ? 'text-primary' : 'text-muted-foreground'}`}>{heading ?? `Problem ${number}`}</h2>
+      <h2 id={`problem-heading-${problemId}`} className={`text-sm font-medium ${heading ? 'text-primary' : 'text-muted-foreground'}`}>{title}</h2>
       {/* Long expressions scroll sideways on phones; the edge fade hints that there is more. */}
       <div
         className="overflow-x-auto text-lg text-foreground sm:text-2xl [mask-image:linear-gradient(to_right,black_92%,transparent)] sm:[mask-image:none]"
         data-testid="student-problem"
         tabIndex={0}
-        aria-label={heading ?? `Problem ${number}`}
+        aria-label={title}
       >
         <MathText source={prompt} display />
       </div>
@@ -244,7 +265,17 @@ function AnswerCard({
           Write your steps here, or take a photo of your paper. Only your tutor sees them, and it helps them spot where things went off track.
         </p>
         {usePad ? (
-          <WorkPad ref={pad} baseUrl={savedIsPhoto ? null : savedWorkUrl} disabled={locked || busy} onDirtyChange={setPadDirty} onInkChange={setPadInk} fullScreenHeading={<MathText source={prompt} display />} />
+          <WorkPad ref={pad} baseUrl={savedIsPhoto ? null : savedWorkUrl} disabled={locked || busy} onDirtyChange={setPadDirty} onInkChange={setPadInk} fullScreenHeading={
+              <>
+                {focusLabel && (
+                  <p className="mb-1 text-xs text-foreground" data-testid="fullscreen-focus">
+                    <span className="font-semibold uppercase tracking-wide text-muted-foreground">Discussing </span>
+                    <span className="hl font-semibold">{focusLabel}</span>
+                  </p>
+                )}
+                <MathText source={prompt} display />
+              </>
+            } />
         ) : (
           photoUrl && (
             <div className="overflow-hidden rounded-xl border border-input bg-white">

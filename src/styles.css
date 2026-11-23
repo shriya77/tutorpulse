@@ -263,3 +263,16 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
+
+/* Student "Discussing" banner: one brief glow when the tutor changes the topic. */
+@keyframes banner-flash {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-highlight) 90%, transparent); transform: scale(1.02); }
+  60% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--color-highlight) 0%, transparent); transform: scale(1); }
+  100% { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+}
+@utility banner-flash {
+  animation: banner-flash 900ms ease-out 2;
+}
+@media (prefers-reduced-motion: reduce) {
+  .banner-flash { animation: none; }
+}

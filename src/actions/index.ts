@@ -13,7 +13,7 @@ import { addSessionNotes, refreshSessionNotes } from './notes-actions'
 import { submitAnswer } from './submit-answer'
 import { draftFollowUp, sendFollowUp } from './follow-up-actions'
 import { tutorHistory } from './history-actions'
-import { sendRecaps, setRecapEmail } from './recap-actions'
+import { myResults, sendRecaps, setRecapEmail } from './recap-actions'
 import { sessionDisplayNames, setDisplayName } from './profile-actions'
 import { cleanupTestSession, deleteSession } from './delete-session'
 
@@ -30,6 +30,7 @@ export const actions: Record<string, ActionHandler<Env>> = {
   sendFollowUp,
   tutorHistory,
   setRecapEmail,
+  myResults,
   sendRecaps,
   setDisplayName,
   sessionDisplayNames,

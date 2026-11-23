@@ -3,6 +3,8 @@
  *
  * - `setRecapEmail`: a joined student ticks or unticks "Email me a recap" for
  *   this one session. Stored in `recapRequests` (server-written only).
+ * - `myResults`: once the session has ended, a joined student sees the same
+ *   results on the ended screen (their own rows only, no email needed).
  * - `sendRecaps`: the tutor of an ENDED session sends each opted-in student
  *   their own recap through the DeepSpace `email/send` integration
  *   (owner-billed). Each student is emailed at most once per session
@@ -12,14 +14,14 @@
  */
 
 import { isTestAccountEmail } from 'deepspace/worker'
-import type { ActionHandler } from 'deepspace/worker'
+import type { ActionHandler, ActionTools } from 'deepspace/worker'
 import type { Env } from '../../worker'
 import { OTHER_LABEL } from '../lib/clusters'
 import { MAX_RECAP_EMAILS_PER_SEND } from '../lib/limits'
 import { buildRecapEmail, type RecapProblem } from '../lib/recapEmail'
 import { requireParticipant, requireTutor } from './guards'
 import { displayNamesFor } from './profile-actions'
-import type { ClusterData, Envelope, ProblemData, RecapRequestData, SubmissionData } from './types'
+import type { ClusterData, Envelope, ProblemData, RecapRequestData, SessionData, SubmissionData } from './types'
 
 /** Student opts in (or out) of a recap email for this session. */
 export const setRecapEmail: ActionHandler<Env> = async (ctx) => {
@@ -54,6 +56,33 @@ export function studentResults(
   })
 }
 
+/** The session's own problems in order (not follow-up checks), as the tutor wrote them. */
+async function sessionProblems(tools: ActionTools, session: Envelope<SessionData>): Promise<Envelope<ProblemData>[]> {
+  const res = await tools.query<ProblemData>('problems', { where: { sessionId: session.recordId }, limit: 100 })
+  return (res.success ? (res.data.records as Envelope<ProblemData>[]) : [])
+    .filter((p) => p.createdBy === session.createdBy && p.data.followUp !== 1)
+    .sort((a, b) => a.data.order - b.data.order)
+}
+
+/**
+ * A joined student's own results, once the session has ended. While it is
+ * live, students never see whether they were right. Returns only the
+ * caller's submissions and group labels (never the AI explanation, the
+ * answer key or anyone else's work), the same as the recap email.
+ */
+export const myResults: ActionHandler<Env> = async (ctx) => {
+  const g = await requireParticipant(ctx, ctx.params.sessionId, { statuses: ['closed'] })
+  if (!g.ok) return { success: false, error: g.error }
+  const session = g.session
+  const problems = await sessionProblems(ctx.tools, session)
+  const subs = await ctx.tools.query<SubmissionData>('submissions', { where: { sessionId: session.recordId, studentId: ctx.userId }, limit: 100 })
+  const mine = subs.success ? (subs.data.records as Envelope<SubmissionData>[]) : []
+  const clRes = await ctx.tools.query<ClusterData>('clusters', { where: { sessionId: session.recordId }, limit: 200 })
+  const clusters = clRes.success ? (clRes.data.records as Envelope<ClusterData>[]) : []
+  const results = studentResults(problems, mine, clusters).map((r, i) => ({ ...r, prompt: problems[i].data.prompt }))
+  return { success: true, data: { results } }
+}
+
 /** Tutor emails every opted-in student who hasn't had their recap yet. Returns counts only. */
 export const sendRecaps: ActionHandler<Env> = async (ctx) => {
   const g = await requireTutor(ctx, ctx.params.sessionId, { statuses: ['closed'] })
@@ -67,10 +96,7 @@ export const sendRecaps: ActionHandler<Env> = async (ctx) => {
     .slice(0, MAX_RECAP_EMAILS_PER_SEND)
   if (pending.length === 0) return { success: true, data: { sent: 0, testAccounts: 0, failed: 0 } }
 
-  const probRes = await ctx.tools.query<ProblemData>('problems', { where: { sessionId: session.recordId }, limit: 100 })
-  const problems = (probRes.success ? (probRes.data.records as Envelope<ProblemData>[]) : [])
-    .filter((p) => p.createdBy === session.createdBy && p.data.followUp !== 1)
-    .sort((a, b) => a.data.order - b.data.order)
+  const problems = await sessionProblems(ctx.tools, session)
   const clRes = await ctx.tools.query<ClusterData>('clusters', { where: { sessionId: session.recordId }, limit: 200 })
   const clusters = clRes.success ? (clRes.data.records as Envelope<ClusterData>[]) : []
   const shared = await ctx.tools.query('practiceSets', { where: { sessionId: session.recordId, status: 'published' }, limit: 1 })
