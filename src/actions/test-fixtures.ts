@@ -91,7 +91,14 @@ const cleanupPrivacyFixture: ActionHandler<Env> = async ({ userId, params, tools
   }
 
   let deleted = 0
-  for (const collection of ['practiceSets', 'clusters', 'submissions', 'problems']) {
+  // Keys of every problem in the session (follow-up checks have their own).
+  const problems = await tools.query('problems', { where: { sessionId }, limit: 100 })
+  for (const p of problems.success ? problems.data.records : []) {
+    if (p.recordId === params.problemId) continue
+    const res = await tools.deleteWhere('answerKeys', { problemId: p.recordId })
+    if (res.success) deleted += res.data.deleted
+  }
+  for (const collection of ['practiceSets', 'clusters', 'submissions', 'followUps', 'problems']) {
     const res = await tools.deleteWhere(collection, { sessionId })
     if (res.success) deleted += res.data.deleted
   }

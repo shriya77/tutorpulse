@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkAnswer, normalizeExpression, parseSafe } from './answerCheck'
+import { checkAnswer, normalizeExpression, parseSafe, derivativeProblem } from './answerCheck'
 
 /** T6 — answer equivalence. */
 describe('checkAnswer (T6)', () => {
@@ -94,5 +94,23 @@ describe('normalizeExpression / parseSafe', () => {
     // Only the right-hand side of `=` is parsed, so an assignment never reaches mathjs.
     expect(normalizeExpression('x = 3')).toBe('3')
     expect(parseSafe('cos(x)')).not.toBeNull()
+  })
+})
+
+describe('derivativeProblem (follow-up checks)', () => {
+  it('writes the prompt and an exact key from a function', () => {
+    const p = derivativeProblem('cos(5x^3)')!
+    expect(p.prompt).toContain('\\frac{d}{dx}')
+    expect(checkAnswer('-15x^2*sin(5x^3)', p.answer).verdict).toBe('correct')
+    expect(checkAnswer('-sin(5x^3)', p.answer).verdict).toBe('incorrect')
+  })
+  it('handles products, exponentials and ln', () => {
+    expect(checkAnswer('2x*e^(4x) + 4x^2*e^(4x)', derivativeProblem('x^2*e^(4x)')!.answer).verdict).toBe('correct')
+    expect(checkAnswer('2x/(x^2+1)', derivativeProblem('ln(x^2+1)')!.answer).verdict).toBe('correct')
+  })
+  it('refuses unsafe or constant input', () => {
+    expect(derivativeProblem('import("fs")')).toBeNull()
+    expect(derivativeProblem('5')).toBeNull()
+    expect(derivativeProblem('')).toBeNull()
   })
 })

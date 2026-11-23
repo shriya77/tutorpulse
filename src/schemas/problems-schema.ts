@@ -32,6 +32,14 @@ export const problemsSchema: CollectionSchema = {
       interpretation: { kind: 'select', options: ['idle', 'running', 'dirty'] },
       default: 'idle',
     },
+    /**
+     * Server-only (set by `sendFollowUp`): 1 = a follow-up check sent to one
+     * misconception group. Carries no label or student list, because every
+     * member can read problems; who received it lives in `followUps`.
+     */
+    { name: 'followUp', storage: 'number', interpretation: { kind: 'boolean' }, default: 0 },
+    /** Server-only: the problem a follow-up checks. */
+    { name: 'parentProblemId', storage: 'text', interpretation: 'plain', default: '' },
   ],
   permissions: {
     '*': DENY_ALL,

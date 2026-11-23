@@ -176,3 +176,23 @@ export function checkAnswer(studentRaw: string, keyRaw: string, seed = 20261121)
   if (compared < SAMPLE_COUNT) return { verdict: 'needs_review', reason: 'too_few_sample_points' }
   return { verdict: 'correct' }
 }
+
+/**
+ * A derivative question built entirely by code: given a function of x (e.g.
+ * from the AI), mathjs writes the prompt and differentiates it for the key,
+ * so the key always matches the question. Null if the function isn't a safe
+ * allowlisted expression or mathjs can't differentiate it.
+ */
+export function derivativeProblem(fnRaw: string): { prompt: string; answer: string } | null {
+  const node = parseSafe(fnRaw)
+  if (!node || !node.toString().includes('x')) return null
+  try {
+    // mathjs differentiates log(), not ln(): rename before, then check the result is still safe.
+    const fn = math.parse(node.toString().replace(/\bln\(/g, 'log('))
+    const answer = math.simplify(math.derivative(fn, 'x')).toString({ implicit: 'show' }).replace(/\s+/g, '')
+    if (!parseSafe(answer)) return null
+    return { prompt: `\\frac{d}{dx}\\left(${fn.toTex({ parenthesis: 'auto' })}\\right)`, answer }
+  } catch {
+    return null
+  }
+}

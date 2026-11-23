@@ -32,6 +32,8 @@ export const sessionsSchema: CollectionSchema = {
     { name: 'clusterRuns', storage: 'number', interpretation: 'plain', default: 0 },
     { name: 'practiceSetRuns', storage: 'number', interpretation: 'plain', default: 0 },
     { name: 'hintTurns', storage: 'number', interpretation: 'plain', default: 0 },
+    /** Server-only: AI follow-up drafts used (cap in src/lib/limits.ts). */
+    { name: 'followUpDrafts', storage: 'number', interpretation: 'plain', default: 0 },
   ],
   collaboratorsField: 'participantIds',
   permissions: {

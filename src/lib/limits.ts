@@ -17,3 +17,6 @@ export const NOTES_MIME_TYPES = ['application/pdf', 'text/plain', 'text/markdown
 export const MAX_WORK_BYTES = 1024 * 1024
 /** Working images sent to the clustering model per run (cost and latency). */
 export const MAX_WORK_IMAGES_PER_RUN = 12
+
+/** AI follow-up problem drafts per session (owner-billed). */
+export const MAX_FOLLOWUP_DRAFTS_PER_SESSION = 15

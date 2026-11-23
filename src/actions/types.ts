@@ -16,6 +16,7 @@ export type SessionData = {
   clusterRuns: number
   practiceSetRuns: number
   hintTurns?: number
+  followUpDrafts?: number
 }
 
 export type ProblemData = {
@@ -24,6 +25,9 @@ export type ProblemData = {
   prompt: string
   status: 'open' | 'locked'
   clusterState: 'idle' | 'running' | 'dirty'
+  /** 1 = a follow-up check for one misconception group (server-set). */
+  followUp?: number
+  parentProblemId?: string
 }
 
 /** A record envelope as returned by `tools.get` / `tools.query`. */
@@ -62,6 +66,15 @@ export type ClusterData = {
   explanation: string
   count: number
   submissionIds: string[]
+  tutorIds: string[]
+}
+
+export type FollowUpData = {
+  sessionId: string
+  problemId: string
+  parentProblemId: string
+  label: string
+  studentId: string
   tutorIds: string[]
 }
 

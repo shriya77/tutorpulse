@@ -7,9 +7,9 @@
 
 import { useCallback, useMemo, useState } from 'react'
 import { useMutations } from 'deepspace'
-import { Badge, Button } from '@/components/ui'
-import type { ClusterData, Envelope, ProblemData, SessionData, SubmissionData } from '../../actions/types'
-import { useAnswerKeys, useSessionClusters, useSessionProblems, useSessionSubmissions } from '../../hooks/useSessionData'
+import { Badge, Button, Input, Label } from '@/components/ui'
+import type { ClusterData, Envelope, FollowUpData, ProblemData, SessionData, SubmissionData } from '../../actions/types'
+import { useAnswerKeys, useFollowUps, useSessionClusters, useSessionProblems, useSessionSubmissions } from '../../hooks/useSessionData'
 import { callAction } from '../../lib/callAction'
 import { useWorkImage } from '../../hooks/useWorkImage'
 import { OTHER_LABEL } from '../../lib/clusters'
@@ -22,7 +22,7 @@ import { TopicPicker } from './TopicPicker'
 import { TutorRoster } from './TutorRoster'
 
 export function TutorView({ session }: { session: Envelope<SessionData> }) {
-  const { problems, status } = useSessionProblems(session.recordId, session.createdBy)
+  const { problems, followUpProblems, status } = useSessionProblems(session.recordId, session.createdBy)
   const { byProblem } = useAnswerKeys()
   const [editing, setEditing] = useState(false)
 
@@ -44,7 +44,7 @@ export function TutorView({ session }: { session: Envelope<SessionData> }) {
       <LiveHeader session={session} />
       {session.data.status === 'closed' && <PracticeSetPanel session={session} />}
       {session.data.status === 'open' && <TutorRoster session={session} problems={problems} />}
-      <Board session={session} problems={problems} />
+      <Board session={session} problems={problems} followUpProblems={followUpProblems} />
       <section className="space-y-3">
         <Button variant="outline" size="sm" onClick={() => setEditing((v) => !v)} aria-expanded={editing}>
           {editing ? 'Done editing problems' : 'Edit problems'}
@@ -143,8 +143,24 @@ interface ProblemStats {
   needsReview: number
 }
 
-function Board({ session, problems }: { session: Envelope<SessionData>; problems: Envelope<ProblemData>[] }) {
+function Board({
+  session, problems, followUpProblems,
+}: {
+  session: Envelope<SessionData>
+  problems: Envelope<ProblemData>[]
+  followUpProblems: Envelope<ProblemData>[]
+}) {
   const { records: submissions } = useSessionSubmissions(session.recordId)
+  const { records: followUpRows } = useFollowUps(session.recordId)
+  // Per follow-up problem: the group label and how many students it went to.
+  const followUpInfo = useMemo(() => {
+    const m = new Map<string, { label: string; students: number }>()
+    for (const r of followUpRows as Envelope<FollowUpData>[]) {
+      const cur = m.get(r.data.problemId)
+      m.set(r.data.problemId, { label: r.data.label, students: (cur?.students ?? 0) + 1 })
+    }
+    return m
+  }, [followUpRows])
   const { records: clusters } = useSessionClusters(session.recordId)
 
   const stats = useMemo(() => {
@@ -184,7 +200,7 @@ function Board({ session, problems }: { session: Envelope<SessionData>; problems
   return (
     <ol className="space-y-4" aria-label="Misconception radar">
       {problems.map((p, i) => (
-        <li key={p.recordId}>
+        <li key={p.recordId} className="space-y-3">
           <ProblemBoardCard
             index={i}
             problem={p}
@@ -193,6 +209,21 @@ function Board({ session, problems }: { session: Envelope<SessionData>; problems
             clusters={clustersByProblem.get(p.recordId) ?? []}
             submissionById={submissionById}
           />
+          {followUpProblems
+            .filter((f) => f.data.parentProblemId === p.recordId)
+            .map((f) => (
+              <div key={f.recordId} className="ml-4 border-l-2 border-dashed border-border pl-4 sm:ml-8">
+                <ProblemBoardCard
+                  index={i}
+                  problem={f}
+                  session={session}
+                  stats={stats.get(f.recordId) ?? { submitted: 0, correct: 0, needsReview: 0 }}
+                  clusters={clustersByProblem.get(f.recordId) ?? []}
+                  submissionById={submissionById}
+                  followUp={followUpInfo.get(f.recordId) ?? { label: '', students: 0 }}
+                />
+              </div>
+            ))}
         </li>
       ))}
     </ol>
@@ -200,7 +231,7 @@ function Board({ session, problems }: { session: Envelope<SessionData>; problems
 }
 
 function ProblemBoardCard({
-  index, problem, session, stats, clusters, submissionById,
+  index, problem, session, stats, clusters, submissionById, followUp,
 }: {
   index: number
   problem: Envelope<ProblemData>
@@ -208,6 +239,8 @@ function ProblemBoardCard({
   stats: ProblemStats
   clusters: Envelope<ClusterData>[]
   submissionById: Map<string, Envelope<SubmissionData>>
+  /** Set when this card is a follow-up check sent to one group. */
+  followUp?: { label: string; students: number }
 }) {
   const sessions = useMutations<Partial<SessionData>>('sessions')
   const problems = useMutations<Partial<ProblemData>>('problems')
@@ -218,16 +251,25 @@ function ProblemBoardCard({
   const wrong = stats.submitted - stats.correct
 
   return (
-    <article className={`rounded-2xl border bg-card p-5 shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] ${isCurrent ? 'border-primary ring-2 ring-primary/30' : 'border-border'}`} data-testid="board-problem">
+    <article
+      className={`rounded-2xl border bg-card p-5 shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] ${isCurrent ? 'border-primary ring-2 ring-primary/30' : 'border-border'}`}
+      data-testid={followUp ? 'follow-up-problem' : 'board-problem'}
+    >
       <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">Problem {index + 1}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          {followUp ? (
+            <span className="text-sm font-medium text-muted-foreground">
+              Follow-up check for “{followUp.label}” · sent to {followUp.students} student{followUp.students === 1 ? '' : 's'}
+            </span>
+          ) : (
+            <span className="text-sm font-medium text-muted-foreground">Problem {index + 1}</span>
+          )}
           {isCurrent && <Badge variant="info">Showing to students</Badge>}
           {locked && <Badge variant="outline">Locked</Badge>}
         </div>
         {live && (
           <div className="flex gap-2">
-            {!isCurrent && (
+            {!isCurrent && !followUp && (
               <Button size="sm" variant="outline" disabled={!sessions.ready} onClick={() => sessions.put(session.recordId, { currentProblemId: problem.recordId })}>
                 Show to students
               </Button>
@@ -241,6 +283,11 @@ function ProblemBoardCard({
 
       <div className="my-3 text-xl text-foreground"><MathText source={problem.data.prompt} display /></div>
 
+      {followUp && (
+        <p className="mb-2 text-sm text-foreground" data-testid="follow-up-result">
+          {stats.correct} of {followUp.students} now get it right{stats.submitted < followUp.students ? ` (${followUp.students - stats.submitted} still to answer)` : ''}.
+        </p>
+      )}
       <dl className="grid grid-cols-3 gap-3 text-center" data-testid="problem-stats">
         <Stat label="Submitted" value={stats.submitted} testId="stat-submitted" tone="bg-secondary" />
         <Stat label="Correct" value={stats.correct} testId="stat-correct" tone="bg-success/12" />
@@ -299,6 +346,7 @@ function ClusterItem({
 }) {
   const sessions = useMutations<Partial<SessionData>>('sessions')
   const [open, setOpen] = useState(false)
+  const [composing, setComposing] = useState(false)
   const onBoard = session.data.focusLabel === cluster.data.label
   // Only answers that are still wrong count (see liveCount in Board).
   const answers = (cluster.data.submissionIds ?? [])
@@ -335,7 +383,13 @@ function ClusterItem({
             {onBoard ? 'Remove from board' : 'Take to board'}
           </Button>
         )}
+        {live && !composing && (
+          <Button size="sm" variant="outline" onClick={() => setComposing(true)} data-testid="follow-up-open">
+            Check it landed
+          </Button>
+        )}
       </div>
+      {composing && <FollowUpComposer clusterId={cluster.recordId} onDone={() => setComposing(false)} />}
       {open && (
         <ul id={panelId} className="mt-2 space-y-1 border-t border-border pt-2" data-testid="cluster-answers">
           {answers.map((s) => (
@@ -368,5 +422,97 @@ function WorkThumb({ submissionId, revision }: { submissionId: string; revision:
     >
       <img src={url} alt="Student's handwritten working" className={big ? 'w-full max-w-2xl rounded-lg' : 'h-24 w-auto rounded-lg'} />
     </button>
+  )
+}
+
+type Draft = { prompt: string; answer: string; verified: boolean; students: number }
+
+/**
+ * "Check it landed": the AI drafts one fresh problem aimed at this group's
+ * misconception; the tutor reviews it and sends it to the group only.
+ * A derivative question's key is computed by mathjs ("checked by maths");
+ * anything else must be checked by the tutor before sending.
+ */
+function FollowUpComposer({ clusterId, onDone }: { clusterId: string; onDone: () => void }) {
+  const [draft, setDraft] = useState<Draft | null>(null)
+  const [busy, setBusy] = useState<'drafting' | 'sending' | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [edited, setEdited] = useState(false)
+
+  const write = async () => {
+    setBusy('drafting')
+    setError(null)
+    const r = await callAction<Draft>('draftFollowUp', { clusterId })
+    setBusy(null)
+    if (r.ok) {
+      setDraft(r.data)
+      setEdited(false)
+    } else setError(r.error)
+  }
+  const send = async () => {
+    if (!draft) return
+    setBusy('sending')
+    setError(null)
+    const r = await callAction('sendFollowUp', { clusterId, prompt: draft.prompt, answer: draft.answer })
+    setBusy(null)
+    if (r.ok) onDone()
+    else setError(r.error)
+  }
+  const checked = draft?.verified && !edited
+
+  return (
+    <div className="mt-3 space-y-3 rounded-xl border border-border bg-secondary/40 p-3" data-testid="follow-up-composer">
+      <p className="text-sm text-muted-foreground">
+        Send this group one new problem aimed at the same mistake, to see if it really cleared. Only they will see it.
+      </p>
+      {!draft ? (
+        <div className="flex gap-2">
+          <Button size="sm" onClick={write} disabled={busy !== null} data-testid="follow-up-draft">
+            {busy === 'drafting' ? 'Writing a problem…' : 'Write a follow-up problem'}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={onDone}>Cancel</Button>
+        </div>
+      ) : (
+        <>
+          <div className="rounded-lg bg-card p-3 text-lg" data-testid="follow-up-preview"><MathText source={draft.prompt} display /></div>
+          <div className="grid gap-1.5 sm:grid-cols-2">
+            <div className="grid gap-1">
+              <Label htmlFor={`fu-prompt-${clusterId}`}>Problem (LaTeX)</Label>
+              <Input
+                id={`fu-prompt-${clusterId}`}
+                value={draft.prompt}
+                onChange={(e) => { setDraft({ ...draft, prompt: e.target.value }); setEdited(true) }}
+                className="font-mono text-xs"
+              />
+            </div>
+            <div className="grid gap-1">
+              <Label htmlFor={`fu-answer-${clusterId}`}>Answer key</Label>
+              <Input
+                id={`fu-answer-${clusterId}`}
+                value={draft.answer}
+                onChange={(e) => { setDraft({ ...draft, answer: e.target.value }); setEdited(true) }}
+                className="font-mono text-xs"
+                data-testid="follow-up-answer"
+              />
+            </div>
+          </div>
+          <p className={`text-xs ${checked ? 'text-success' : 'text-foreground'}`} data-testid="follow-up-key-status">
+            {checked
+              ? 'Answer key worked out by maths from the problem, not by AI.'
+              : 'Check this answer key yourself before sending.'}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={send} disabled={busy !== null || !draft.prompt.trim() || !draft.answer.trim()} data-testid="follow-up-send">
+              {busy === 'sending' ? 'Sending…' : `Send to ${draft.students} student${draft.students === 1 ? '' : 's'}`}
+            </Button>
+            <Button size="sm" variant="outline" onClick={write} disabled={busy !== null}>
+              {busy === 'drafting' ? 'Writing…' : 'Try another'}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onDone} disabled={busy !== null}>Cancel</Button>
+          </div>
+        </>
+      )}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    </div>
   )
 }

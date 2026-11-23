@@ -7,7 +7,7 @@
 
 import { useMemo } from 'react'
 import { useQuery } from 'deepspace'
-import type { AnswerKeyData, ClusterData, ProblemData, SessionData, SubmissionData } from '../actions/types'
+import type { AnswerKeyData, ClusterData, FollowUpData, ProblemData, SessionData, SubmissionData } from '../actions/types'
 
 export function useSessionRecord(sessionId: string | undefined) {
   const { records, status } = useQuery<SessionData>('sessions')
@@ -15,14 +15,26 @@ export function useSessionRecord(sessionId: string | undefined) {
   return { session, status }
 }
 
-/** Problems of a session, in order. Only rows the session's tutor created count. */
+/**
+ * Problems of a session, in order. Only rows the session's tutor created count.
+ * Follow-up checks (sent to one misconception group) are returned separately,
+ * newest first, so they never shift the "Problem N" numbering.
+ */
 export function useSessionProblems(sessionId: string, tutorId: string | undefined) {
   const { records, status } = useQuery<ProblemData>('problems', { where: { sessionId } })
-  const problems = useMemo(
-    () => records.filter((p) => p.createdBy === tutorId).sort((a, b) => (a.data.order ?? 0) - (b.data.order ?? 0)),
-    [records, tutorId],
-  )
-  return { problems, status }
+  const { problems, followUpProblems } = useMemo(() => {
+    const own = records.filter((p) => p.createdBy === tutorId)
+    return {
+      problems: own.filter((p) => p.data.followUp !== 1).sort((a, b) => (a.data.order ?? 0) - (b.data.order ?? 0)),
+      followUpProblems: own.filter((p) => p.data.followUp === 1).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    }
+  }, [records, tutorId])
+  return { problems, followUpProblems, status }
+}
+
+/** Follow-up rows: a student gets only their own, the tutor gets all of the session's. */
+export function useFollowUps(sessionId: string) {
+  return useQuery<FollowUpData>('followUps', { where: { sessionId } })
 }
 
 /** Tutor only: their answer keys, indexed by problem id. */

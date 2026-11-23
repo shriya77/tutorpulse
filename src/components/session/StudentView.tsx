@@ -9,8 +9,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useAuth, usePresenceRoom, useQuery, useR2Files } from 'deepspace'
 import { Button, Input, Label } from '@/components/ui'
-import type { Envelope, SessionData, SubmissionData } from '../../actions/types'
-import { useSessionProblems } from '../../hooks/useSessionData'
+import type { Envelope, FollowUpData, SessionData, SubmissionData } from '../../actions/types'
+import { useFollowUps, useSessionProblems } from '../../hooks/useSessionData'
 import { callAction } from '../../lib/callAction'
 import { workRelativeKey } from '../../lib/work'
 import { useWorkImage } from '../../hooks/useWorkImage'
@@ -27,9 +27,15 @@ export interface StudentPresence {
 }
 
 export function StudentView({ session }: { session: Envelope<SessionData> }) {
-  const { problems, status } = useSessionProblems(session.recordId, session.createdBy)
+  const { problems, followUpProblems, status } = useSessionProblems(session.recordId, session.createdBy)
   // RBAC returns only this student's own submissions.
   const { records: mySubmissions } = useQuery<SubmissionData>('submissions', { where: { sessionId: session.recordId } })
+  // RBAC returns only follow-ups sent to THIS student.
+  const { records: myFollowUps } = useFollowUps(session.recordId)
+  const followUp = followUpProblems.find(
+    (p) => p.data.status !== 'locked' && (myFollowUps as Envelope<FollowUpData>[]).some((f) => f.data.problemId === p.recordId),
+  )
+  const followUpMine = followUp ? mySubmissions.find((s) => s.data.problemId === followUp.recordId) : undefined
   const [stuck, setStuck] = useState(false)
   const { connected, updateState } = usePresenceRoom(`session:${session.recordId}`)
   const { userId } = useAuth()
@@ -65,6 +71,18 @@ export function StudentView({ session }: { session: Envelope<SessionData> }) {
           <span className="hl font-display text-xl font-semibold">{session.data.focusLabel}</span>
         </div>
       )}
+      {followUp && (
+        <AnswerCard
+          key={followUp.recordId}
+          problemId={followUp.recordId}
+          number={0}
+          heading="Quick check from your tutor"
+          prompt={followUp.data.prompt}
+          locked={false}
+          mine={followUpMine}
+          onSubmitted={() => setStuck(false)}
+        />
+      )}
       {status === 'loading' ? (
         <p className="text-muted-foreground">Loading…</p>
       ) : !problem ? (
@@ -99,10 +117,12 @@ export function StudentView({ session }: { session: Envelope<SessionData> }) {
 }
 
 function AnswerCard({
-  problemId, number, prompt, locked, mine, onSubmitted,
+  problemId, number, heading, prompt, locked, mine, onSubmitted,
 }: {
   problemId: string
   number: number
+  /** Replaces "Problem N" (used for a follow-up check). */
+  heading?: string
   prompt: string
   locked: boolean
   mine?: Envelope<SubmissionData>
@@ -166,14 +186,14 @@ function AnswerCard({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4 rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] p-5" aria-labelledby="problem-heading">
-      <h2 id="problem-heading" className="text-sm font-medium text-muted-foreground">Problem {number}</h2>
+    <form onSubmit={onSubmit} className="space-y-4 rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] p-5" aria-labelledby={`problem-heading-${problemId}`} data-testid={heading ? 'follow-up-card' : 'answer-card'}>
+      <h2 id={`problem-heading-${problemId}`} className={`text-sm font-medium ${heading ? 'text-primary' : 'text-muted-foreground'}`}>{heading ?? `Problem ${number}`}</h2>
       {/* Long expressions scroll sideways on phones; the edge fade hints that there is more. */}
       <div
         className="overflow-x-auto text-lg text-foreground sm:text-2xl [mask-image:linear-gradient(to_right,black_92%,transparent)] sm:[mask-image:none]"
         data-testid="student-problem"
         tabIndex={0}
-        aria-label={`Problem ${number}`}
+        aria-label={heading ?? `Problem ${number}`}
       >
         <MathText source={prompt} display />
       </div>
@@ -187,9 +207,9 @@ function AnswerCard({
       </div>
 
       <div className="grid gap-1.5">
-        <Label htmlFor="answer">Your final answer</Label>
+        <Label htmlFor={`answer-${problemId}`}>Your final answer</Label>
         <Input
-          id="answer"
+          id={`answer-${problemId}`}
           data-testid="answer-input"
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
@@ -204,11 +224,11 @@ function AnswerCard({
       </div>
       {showExplanation && (
         <div className="grid gap-1.5">
-          <Label htmlFor="explanation">
+          <Label htmlFor={`explanation-${problemId}`}>
             How did you get it? <span className="font-normal text-muted-foreground">(optional, one line)</span>
           </Label>
           <Input
-            id="explanation"
+            id={`explanation-${problemId}`}
             data-testid="explanation-input"
             value={explanation}
             onChange={(e) => {

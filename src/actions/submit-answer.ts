@@ -25,7 +25,7 @@ import { checkAnswer, type Verdict } from '../lib/answerCheck'
 import { MAX_WORK_BYTES } from '../lib/limits'
 import { isPngBytes } from '../lib/work'
 import { requestClustering } from './clustering-trigger'
-import { loadSessionProblem, requireParticipant } from './guards'
+import { loadSessionProblem, PROBLEM_NOT_FOUND, requireParticipant } from './guards'
 import type { AnswerKeyData, Envelope, SubmissionData } from './types'
 
 export const MAX_ANSWER_LENGTH = 200
@@ -54,6 +54,11 @@ export const submitAnswer: ActionHandler<Env> = async (ctx) => {
   if (!g.ok) return { success: false, error: g.error }
   const { session } = g
   if (problem.data.status === 'locked') return { success: false, error: 'This problem is locked' }
+  // A follow-up check is only for the students it was sent to.
+  if (problem.data.followUp === 1) {
+    const mine = await ctx.tools.query('followUps', { where: { problemId: problem.recordId, studentId: ctx.userId }, limit: 1 })
+    if (!mine.success || mine.data.count === 0) return { success: false, error: PROBLEM_NOT_FOUND }
+  }
 
   // The key must be the tutor's own; a key planted by anyone else is ignored.
   const keys = await ctx.tools.query('answerKeys', { where: { problemId: problem.recordId } })
