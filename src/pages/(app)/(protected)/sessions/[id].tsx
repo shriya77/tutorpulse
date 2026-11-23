@@ -9,6 +9,7 @@ import { useAuth } from 'deepspace'
 import { Badge } from '@/components/ui'
 import { StudentView } from '../../../../components/session/StudentView'
 import { TutorView } from '../../../../components/session/TutorView'
+import { RenameSession, SessionTitle } from '../../../../components/session/ManageSession'
 import { useSessionRecord } from '../../../../hooks/useSessionData'
 
 export default function SessionPage() {
@@ -40,7 +41,7 @@ export default function SessionPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6">
       <header className="flex flex-wrap items-center gap-3">
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground" data-testid="session-title">{session.data.title}</h1>
+        {isTutor ? <RenameSession session={session} /> : <SessionTitle title={session.data.title} />}
         <Badge variant={session.data.status === 'open' ? 'success' : 'outline'}>
           {session.data.status === 'open' ? 'Live' : session.data.status === 'draft' ? 'Draft' : 'Ended'}
         </Badge>

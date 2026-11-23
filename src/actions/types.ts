@@ -17,6 +17,7 @@ export type SessionData = {
   practiceSetRuns: number
   hintTurns?: number
   followUpDrafts?: number
+  archived?: number
 }
 
 export type ProblemData = {

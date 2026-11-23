@@ -19,7 +19,7 @@ import { JoinQr } from './JoinQr'
 import { NotesPanel } from './NotesPanel'
 import { PracticeSetPanel } from './PracticeSetPanel'
 import { RecapSender } from './RecapEmail'
-import { DeleteSession } from './DeleteSession'
+import { ManageSession } from './ManageSession'
 import { TopicPicker } from './TopicPicker'
 import { TutorRoster } from './TutorRoster'
 
@@ -37,7 +37,7 @@ export function TutorView({ session }: { session: Envelope<SessionData> }) {
         <TopicPicker session={session} />
         <ProblemEditor sessionId={session.recordId} problems={problems} keys={byProblem} />
         <NotesPanel sessionId={session.recordId} />
-        <DeleteSession session={session} />
+        <ManageSession session={session} />
       </div>
     )
   }
@@ -57,7 +57,7 @@ export function TutorView({ session }: { session: Envelope<SessionData> }) {
         {editing && session.data.status === 'open' && <TopicPicker session={session} />}
         {editing && session.data.status === 'open' && <NotesPanel sessionId={session.recordId} />}
       </section>
-      {session.data.status === 'closed' && <DeleteSession session={session} />}
+      {session.data.status === 'closed' && <ManageSession session={session} />}
     </div>
   )
 }

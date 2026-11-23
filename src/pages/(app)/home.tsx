@@ -7,9 +7,10 @@ import { Link, useNavigate } from 'react-router-dom'
 import { AuthOverlay, useAuth, useMutations, useQuery } from 'deepspace'
 import { DoorOpen, PenLine } from 'lucide-react'
 import { Badge, Button, Input, Label } from '@/components/ui'
-import type { SessionData } from '../../actions/types'
+import type { Envelope, SessionData } from '../../actions/types'
 import { callAction } from '../../lib/callAction'
 import { normalizeJoinCode } from '../../lib/joinCode'
+import { shortDate } from '../../lib/dates'
 
 export default function HomePage() {
   const { isSignedIn } = useAuth()
@@ -140,50 +141,80 @@ function NewSessionCard() {
 }
 
 const STATUS_LABEL: Record<SessionData['status'], string> = { draft: 'Draft', open: 'Live', closed: 'Ended' }
+const SHOW_FIRST = 8
 
 function SessionLists() {
   const { userId } = useAuth()
-  const { records, status } = useQuery<SessionData>('sessions', { orderBy: 'updatedAt', orderDir: 'desc' })
+  const { records, status } = useQuery<SessionData>('sessions', { orderBy: 'createdAt', orderDir: 'desc' })
   if (status === 'loading') return <p className="text-sm text-muted-foreground">Loading your sessions…</p>
   if (status === 'error') return <p role="alert" className="text-sm text-destructive">Could not load your sessions.</p>
 
-  const teaching = records.filter((r) => r.createdBy === userId)
+  const mine = records.filter((r) => r.createdBy === userId)
+  const teaching = mine.filter((r) => r.data.archived !== 1)
+  const archived = mine.filter((r) => r.data.archived === 1)
   const joined = records.filter((r) => r.createdBy !== userId)
 
   return (
     <div className="grid gap-8 md:grid-cols-2">
-      {[
-        { title: 'Sessions you run', rows: teaching, empty: 'None yet. Create one above.' },
-        { title: 'Sessions you joined', rows: joined, empty: 'None yet. Enter a code above.' },
-      ].map((list) => (
-        <section key={list.title} aria-label={list.title} className="min-w-0 space-y-3">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="font-display text-lg font-semibold text-foreground">{list.title}</h2>
-            {list.title === 'Sessions you run' && list.rows.length > 0 && (
-              <Link to="/history" className="text-sm font-medium text-primary hover:underline" data-testid="history-link">
-                Students over time →
-              </Link>
-            )}
-          </div>
-          {list.rows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{list.empty}</p>
-          ) : (
-            <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-[0_1px_2px_0_rgba(29,43,58,0.05)] p-0">
-              {list.rows.map((s) => (
-                <li key={s.recordId}>
-                  <Link
-                    to={`/sessions/${s.recordId}`}
-                    className="flex items-center justify-between gap-3 px-5 py-3.5 transition-colors hover:bg-secondary"
-                  >
-                    <span className="min-w-0 truncate text-foreground">{s.data.title}</span>
-                    <Badge variant={s.data.status === 'open' ? 'success' : 'outline'}>{STATUS_LABEL[s.data.status]}</Badge>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+      <section aria-label="Sessions you run" className="min-w-0 space-y-3">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="font-display text-lg font-semibold text-foreground">Sessions you run</h2>
+          {mine.length > 0 && (
+            <Link to="/history" className="text-sm font-medium text-primary hover:underline" data-testid="history-link">
+              Students over time →
+            </Link>
           )}
-        </section>
-      ))}
+        </div>
+        <SessionList rows={teaching} empty={archived.length ? 'Nothing here: everything is archived.' : 'None yet. Create one above.'} testId="sessions-run" />
+        {archived.length > 0 && (
+          <details className="group" data-testid="archived-sessions">
+            <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">
+              Archived ({archived.length})
+            </summary>
+            <div className="mt-3">
+              <SessionList rows={archived} empty="" testId="sessions-archived" />
+            </div>
+          </details>
+        )}
+      </section>
+      <section aria-label="Sessions you joined" className="min-w-0 space-y-3">
+        <h2 className="font-display text-lg font-semibold text-foreground">Sessions you joined</h2>
+        <SessionList rows={joined} empty="None yet. Enter a code above." testId="sessions-joined" />
+      </section>
+    </div>
+  )
+}
+
+function SessionList({ rows, empty, testId }: { rows: Envelope<SessionData>[]; empty: string; testId: string }) {
+  const [all, setAll] = useState(false)
+  if (rows.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>
+  // Live sessions first, then newest first.
+  const sorted = [...rows].sort((a, b) => Number(b.data.status === 'open') - Number(a.data.status === 'open'))
+  const shown = all ? sorted : sorted.slice(0, SHOW_FIRST)
+  return (
+    <div className="space-y-2">
+      <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_2px_0_rgba(29,43,58,0.05)]" data-testid={testId}>
+        {shown.map((s) => (
+          <li key={s.recordId}>
+            <Link
+              to={`/sessions/${s.recordId}`}
+              className="flex items-start justify-between gap-3 px-5 py-3 transition-colors hover:bg-secondary"
+              data-testid="session-row"
+            >
+              <span className="min-w-0">
+                <span className="line-clamp-2 break-words text-foreground" title={s.data.title}>{s.data.title}</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground" data-testid="session-date">{shortDate(s.createdAt)}</span>
+              </span>
+              <Badge className="mt-0.5 shrink-0" variant={s.data.status === 'open' ? 'success' : 'outline'}>{STATUS_LABEL[s.data.status]}</Badge>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {rows.length > SHOW_FIRST && (
+        <button type="button" className="text-sm font-medium text-primary hover:underline" onClick={() => setAll((v) => !v)} data-testid="show-all-sessions">
+          {all ? 'Show fewer' : `Show all ${rows.length}`}
+        </button>
+      )}
     </div>
   )
 }
