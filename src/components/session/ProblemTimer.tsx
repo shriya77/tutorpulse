@@ -21,7 +21,13 @@ export function useSecondsLeft(endsAt: string | undefined): number | null {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     if (Number.isNaN(end)) return
-    const t = setInterval(() => setNow(Date.now()), 1000)
+    setNow(Date.now())
+    // Stop once it has run out: "Time's up" doesn't change, so there's nothing to re-render for.
+    const t = setInterval(() => {
+      const t2 = Date.now()
+      setNow(t2)
+      if (t2 >= end) clearInterval(t)
+    }, 1000)
     return () => clearInterval(t)
   }, [end])
   if (Number.isNaN(end)) return null

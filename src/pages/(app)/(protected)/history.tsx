@@ -36,6 +36,7 @@ export default function HistoryPage() {
   useEffect(() => {
     let live = true
     setData(null)
+    setError(null) // a new load: don't keep showing the last one's error
     void callAction<History>('tutorHistory', { days: days || undefined, topic: topic || undefined }).then((r) => {
       if (!live) return
       if (r.ok) {
