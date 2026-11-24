@@ -47,6 +47,14 @@ describe('buildDigest', () => {
     expect(mail.html).toContain('href="https://tutorpulse.app.space/history"')
     expect(mail.text).toContain('Settings: https://tutorpulse.app.space/settings')
   })
+  it('writes dates in US Central time, not UTC', () => {
+    // Sunday 8pm Central is already Monday in UTC.
+    const late = buildHistory({ ...input, sessions: [{ ...input.sessions[0], createdAt: '2026-11-23T02:00:00Z' }], submissions: [], clusters: [] })
+    const m = buildDigest({ tutorName: 'T', from: new Date('2026-11-16T14:00:00Z'), to: new Date('2026-11-24T02:30:00Z'), week: late, month: late, historyUrl: 'h', settingsUrl: 's' })
+    expect(m.text).toContain('- Sun, Nov 22: Chain rule')
+    expect(m.text).toContain('Nov 16 to Nov 23')
+  })
+
   it('is empty when nothing ran', () => {
     expect(isEmptyDigest({ week: buildHistory({ ...input, sessions: [], submissions: [], clusters: [] }) })).toBe(true)
   })

@@ -37,10 +37,13 @@ const MAX_SESSIONS = 8
 const MAX_MISTAKES = 5
 const MAX_STUDENTS = 6
 
+/** The digest's clock: it's sent at 08:00 here (src/cron.ts) and its dates are written in it. */
+export const DIGEST_TIME_ZONE = 'America/Chicago'
+
 const pct = (r: number | null) => (r === null ? 'no answers' : `${Math.round(r * 100)}% right`)
-const day = (iso: string) => new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
+const day = (iso: string) => new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: DIGEST_TIME_ZONE })
 const range = (a: Date, b: Date) =>
-  `${a.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })} to ${b.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}`
+  `${a.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: DIGEST_TIME_ZONE })} to ${b.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: DIGEST_TIME_ZONE })}`
 
 /** Nothing ran in the week: no email is sent (an empty digest is just noise). */
 export function isEmptyDigest(input: Pick<DigestInput, 'week'>): boolean {

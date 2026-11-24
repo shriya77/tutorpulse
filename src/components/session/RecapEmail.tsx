@@ -29,8 +29,13 @@ export function RecapOptIn({ sessionId, recapsSent = false }: { sessionId: strin
       </p>
     )
   }
-  // The tutor has already sent this session's recaps, so a new tick would never be acted on.
-  if (recapsSent) return null
+  // Once the tutor has sent recaps, a new tick would never be acted on, so the box goes.
+  // Someone who asked and is still waiting (past the per-send cap, or a send that failed) is told so.
+  if (recapsSent) {
+    return mine?.data.wantsEmail === 1 ? (
+      <p className="text-sm text-muted-foreground" data-testid="recap-waiting">You asked for a recap. Your tutor hasn’t sent yours yet.</p>
+    ) : null
+  }
   const checked = optimistic ?? mine?.data.wantsEmail === 1
 
   async function toggle(next: boolean) {

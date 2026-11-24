@@ -88,6 +88,16 @@ test('timer, who is left, saved state, pad tips, leaving', async ({ users }) => 
     // Only participants can leave.
     expect((await post(tutor, '/api/actions/leaveSession', { sessionId })).success).toBe(false)
 
+    // A timer left running when the session ends doesn't come back on reopen.
+    await tutor.page.getByTestId('timer-1').click()
+    await expect(a.page.getByTestId('problem-timer')).toBeVisible({ timeout: 15_000 })
+    tutor.page.once('dialog', (d) => d.accept())
+    await tutor.page.getByRole('button', { name: 'End session' }).click()
+    tutor.page.once('dialog', (d) => d.accept())
+    await tutor.page.getByTestId('reopen-session').click()
+    await expect(a.page.getByTestId('student-problem')).toBeVisible({ timeout: 20_000 })
+    await expect(a.page.getByTestId('problem-timer')).toHaveCount(0)
+
     // Ended: A can take it off their list.
     tutor.page.once('dialog', (d) => d.accept())
     await tutor.page.getByRole('button', { name: 'End session' }).click()

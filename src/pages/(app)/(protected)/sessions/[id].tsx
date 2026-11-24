@@ -4,7 +4,7 @@
  * no session row from the data layer and sees "not found".
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from 'deepspace'
 import { Badge } from '@/components/ui'
@@ -27,19 +27,24 @@ export default function SessionPage() {
   const [attempt, setAttempt] = useState(0)
   const [waitedMs, setWaitedMs] = useState(0)
   const [loaded, setLoaded] = useState(false)
-  const started = useRef(Date.now())
-  useEffect(() => {
-    started.current = Date.now()
+  const [startedAt, setStartedAt] = useState(() => Date.now())
+  // A different session: start over. Done while rendering (not in an effect) so the
+  // new page never paints with the old one's "loaded" state, which skipped the
+  // grace period and flashed "Session not found" (e.g. right after Duplicate).
+  const [forId, setForId] = useState(id)
+  if (forId !== id) {
+    setForId(id)
     setAttempt(0)
     setWaitedMs(0)
     setLoaded(false)
-  }, [id])
+    setStartedAt(Date.now())
+  }
   // Tick only until the session is in, so a loaded page isn't re-rendered every second.
   useEffect(() => {
     if (loaded) return
-    const t = setInterval(() => setWaitedMs(Date.now() - started.current), 1000)
+    const t = setInterval(() => setWaitedMs(Date.now() - startedAt), 1000)
     return () => clearInterval(t)
-  }, [id, loaded])
+  }, [startedAt, loaded])
   const onLoaded = useCallback(() => setLoaded(true), [])
   // Only ever remount while nothing has loaded: remounting a loaded page would throw away unsaved work.
   useEffect(() => {

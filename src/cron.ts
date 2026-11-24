@@ -13,11 +13,12 @@ import { buildCronContext } from 'deepspace/worker'
 import type { Env } from '../worker'
 import { DAY_MS, sendTutorDigest, type Reader } from './server/digest'
 import type { Envelope } from './actions/types'
+import { DIGEST_TIME_ZONE } from './lib/digest'
 
 export const WEEKLY_DIGEST = 'weekly-digest'
 const MAX_DIGESTS_PER_RUN = 200
 
-export const tasks: CronTask[] = [{ name: WEEKLY_DIGEST, schedule: '0 8 * * 1', timezone: 'America/Chicago' }]
+export const tasks: CronTask[] = [{ name: WEEKLY_DIGEST, schedule: '0 8 * * 1', timezone: DIGEST_TIME_ZONE }]
 
 type Pref = { userId: string; weekly: number; lastSentAt?: string }
 
