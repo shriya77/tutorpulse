@@ -1,7 +1,5 @@
 # TutorPulse: writeup (draft)
 
-> Drafted by the coding agent from `docs/AGENT_LOG.md` and our chat. Section 5 is drawn from Shriya's own messages and decisions. Edit freely; the body is about 630 words.
-
 ## 1. What I built
 
 In group tutoring, most wrong answers share a few root causes, but the tutor sees them one desk at a time. **TutorPulse** is a live room for group tutoring. Students join from a phone with a code or QR, write their working on a sketch pad and type a final answer. Answers are checked exactly, and the wrong ones are grouped by AI into named misconceptions ("Forgot the inner derivative · 3") on the tutor's board while the session runs. The tutor takes a group to the board, students revise, and a follow-up problem sent to that group checks whether the mistake really cleared. Afterwards students get a typeset practice set aimed at the room's real mistakes, and those who opted in get an email recap of their own results.
