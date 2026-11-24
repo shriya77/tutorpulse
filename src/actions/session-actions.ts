@@ -7,7 +7,7 @@
 import type { ActionHandler, ActionTools } from 'deepspace/worker'
 import type { Env } from '../../worker'
 import { generateJoinCode, normalizeJoinCode } from '../lib/joinCode'
-import { requireParticipant, requireTutor } from './guards'
+import { activeParticipantIds, requireParticipant, requireTutor } from './guards'
 import { joinSessionTeam, leaveSessionTeam } from './session-team'
 import type { Envelope, ProblemData, SessionData } from './types'
 
@@ -62,7 +62,7 @@ export const openSession: ActionHandler<Env> = async (ctx) => {
 export const closeSession: ActionHandler<Env> = async (ctx) => {
   const g = await requireTutor(ctx, ctx.params.sessionId, { statuses: ['open', 'draft'] })
   if (!g.ok) return { success: false, error: g.error }
-  const res = await ctx.tools.update('sessions', g.session.recordId, { status: 'closed', focusLabel: '' })
+  const res = await ctx.tools.update('sessions', g.session.recordId, { status: 'closed', focusLabel: '', timerEndsAt: '', timerProblemId: '' })
   if (!res.success) return { success: false, error: 'Could not close the session' }
   return { success: true, data: { sessionId: g.session.recordId } }
 }
@@ -113,7 +113,8 @@ export const joinSession: ActionHandler<Env> = async (ctx) => {
     if (Array.isArray(data.removedIds) && data.removedIds.includes(ctx.userId)) {
       return { success: false, error: 'Your tutor removed you from this session' }
     }
-    const current = Array.isArray(data.participantIds) ? data.participantIds : []
+    // Written back whole, so drop anyone removed meanwhile rather than restore them.
+    const current = activeParticipantIds(data)
     if (current.includes(ctx.userId)) {
       // In the session's team too, so they can read its problems.
       if (!(await joinSessionTeam(ctx.tools, session.recordId, ctx.userId))) return { success: false, error: 'Could not join, please try again' }
@@ -136,8 +137,7 @@ export const leaveSession: ActionHandler<Env> = async (ctx) => {
   for (let attempt = 0; attempt < 4; attempt++) {
     const fresh = await ctx.tools.get('sessions', g.session.recordId)
     if (!fresh.success) return { success: false, error: 'Could not leave the session' }
-    const current = (fresh.data.record.data as SessionData).participantIds
-    const ids = Array.isArray(current) ? current : []
+    const ids = activeParticipantIds(fresh.data.record.data as SessionData)
     if (!ids.includes(ctx.userId)) {
       await leaveSessionTeam(ctx.tools, g.session.recordId, ctx.userId)
       return { success: true, data: { left: true } }

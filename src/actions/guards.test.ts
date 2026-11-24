@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ActionTools } from 'deepspace/worker'
-import { loadSessionProblem, PROBLEM_NOT_FOUND, requireParticipant, requireTutor, SESSION_NOT_FOUND } from './guards'
+import { activeParticipantIds, loadSessionProblem, PROBLEM_NOT_FOUND, requireParticipant, requireTutor, SESSION_NOT_FOUND } from './guards'
 
 const TUTOR = 'user_tutor'
 const STUDENT = 'user_student'
@@ -60,6 +60,18 @@ describe('requireParticipant', () => {
   it('rejects the tutor (tutors do not submit) and strangers', async () => {
     expect(await requireParticipant({ userId: TUTOR, tools }, 'sess_1')).toEqual({ ok: false, error: SESSION_NOT_FOUND })
     expect(await requireParticipant({ userId: STRANGER, tools }, 'sess_1')).toEqual({ ok: false, error: SESSION_NOT_FOUND })
+  })
+
+  it('rejects a removed student even if a racing write put them back in participantIds', async () => {
+    const raced: Row = { ...session(), data: { ...session().data, participantIds: [STUDENT], removedIds: [STUDENT] } }
+    const g = await requireParticipant({ userId: STUDENT, tools: fakeTools({ sessions: [raced] }) }, 'sess_1')
+    expect(g).toEqual({ ok: false, error: SESSION_NOT_FOUND })
+  })
+
+  it('lists active participants without removed ones', () => {
+    expect(activeParticipantIds({ participantIds: ['a', 'b', 'c'], removedIds: ['b'] })).toEqual(['a', 'c'])
+    expect(activeParticipantIds({ participantIds: ['a'] })).toEqual(['a'])
+    expect(activeParticipantIds(undefined)).toEqual([])
   })
 
   it('treats a malformed participant list as empty', async () => {

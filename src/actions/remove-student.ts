@@ -15,7 +15,7 @@ import { appFiles } from 'deepspace/worker'
 import type { ActionHandler } from 'deepspace/worker'
 import type { Env } from '../../worker'
 import { requestClustering } from './clustering-trigger'
-import { requireTutor } from './guards'
+import { activeParticipantIds, requireTutor } from './guards'
 import { leaveSessionTeam } from './session-team'
 import type { Envelope, ProblemData, SessionData, SubmissionData } from './types'
 
@@ -31,10 +31,9 @@ export const removeStudent: ActionHandler<Env> = async (ctx) => {
   const fresh = await ctx.tools.get<SessionData>('sessions', sessionId)
   if (!fresh.success) return { success: false, error: 'Could not remove the student' }
   const data = fresh.data.record.data as SessionData
-  const now = Array.isArray(data.participantIds) ? data.participantIds : []
   const removed = Array.isArray(data.removedIds) ? data.removedIds : []
   const res = await ctx.tools.update('sessions', sessionId, {
-    participantIds: now.filter((id) => id !== studentId),
+    participantIds: activeParticipantIds(data).filter((id) => id !== studentId),
     removedIds: removed.includes(studentId) ? removed : [...removed, studentId],
   })
   if (!res.success) return { success: false, error: 'Could not remove the student' }

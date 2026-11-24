@@ -52,7 +52,19 @@ export async function requireTutor(
 }
 
 /**
- * The caller must be a joined student of the session. The tutor is not a
+ * The session's students: `participantIds` minus anyone the tutor removed.
+ * Joins and leaves rewrite the whole list from a fresh read, so a write racing
+ * a removal could put a removed student back in it; checking `removedIds` here
+ * means that can never give them access again.
+ */
+export function activeParticipantIds(data: Pick<SessionData, 'participantIds' | 'removedIds'> | undefined): string[] {
+  const ids = Array.isArray(data?.participantIds) ? data.participantIds : []
+  const removed = Array.isArray(data?.removedIds) ? data.removedIds : []
+  return removed.length ? ids.filter((id) => !removed.includes(id)) : ids
+}
+
+/**
+ * The caller must be a joined student of the session (and not one the tutor removed). The tutor is not a
  * participant: tutors do not submit answers.
  */
 export async function requireParticipant(
@@ -61,8 +73,7 @@ export async function requireParticipant(
   options: { statuses?: SessionStatus[] } = {},
 ): Promise<GuardResult<{ session: Envelope<SessionData> }>> {
   const session = await loadSession(ctx, sessionId)
-  const participants = Array.isArray(session?.data.participantIds) ? session.data.participantIds : []
-  if (!session || !participants.includes(ctx.userId)) return { ok: false, error: SESSION_NOT_FOUND }
+  if (!session || !activeParticipantIds(session.data).includes(ctx.userId)) return { ok: false, error: SESSION_NOT_FOUND }
   if (!statusAllowed(session, options.statuses)) {
     return { ok: false, error: `Session is ${session.data.status}` }
   }
