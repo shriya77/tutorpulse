@@ -20,6 +20,7 @@ import { duplicateSession } from './duplicate-session'
 import { removeStudent } from './remove-student'
 import { ensureSessionAccess } from './session-team'
 import { sendDigestPreview, setWeeklyDigest } from './digest-actions'
+import { pastProblems } from './problem-bank-actions'
 
 export const actions: Record<string, ActionHandler<Env>> = {
   openSession,
@@ -46,5 +47,6 @@ export const actions: Record<string, ActionHandler<Env>> = {
   ensureSessionAccess,
   setWeeklyDigest,
   sendDigestPreview,
+  pastProblems,
   cleanupTestSession,
 }

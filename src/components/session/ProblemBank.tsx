@@ -2,16 +2,18 @@
  * "Add from your past problems": every problem the tutor has written in other
  * sessions, with its answer key, filterable by course week and searchable.
  * One click copies it (prompt, key and expected mistakes) into this session.
- * All client-side: RBAC already gives a tutor their own problems, keys and
- * sessions, and nobody else's. Follow-up checks aren't listed. Identical
- * problems (same prompt and key) from several sessions show once, newest first.
+ * Loaded once from the `pastProblems` action when the panel opens (only the
+ * caller's own rows). Follow-up checks aren't listed. Identical problems
+ * (same prompt and key) from several sessions show once, newest first.
  */
 
-import { useMemo, useState } from 'react'
-import { useAuth, useMutations, useQuery } from 'deepspace'
+import { useEffect, useState } from 'react'
+import { useMutations } from 'deepspace'
 import { Library } from 'lucide-react'
 import { Button, Input } from '@/components/ui'
-import type { AnswerKeyData, ProblemData, SessionData } from '../../actions/types'
+import type { AnswerKeyData, ProblemData } from '../../actions/types'
+import type { PastProblem } from '../../actions/problem-bank-actions'
+import { callAction } from '../../lib/callAction'
 import { TOPICS } from '../../lib/topics'
 import { MathText } from '../MathText'
 import { KeyMath } from './ProblemEditor'
@@ -41,56 +43,52 @@ export function ProblemBank({ sessionId, sessionTopic, nextOrder, current }: { s
 }
 
 function BankList({ sessionId, sessionTopic, nextOrder, current }: { sessionId: string; sessionTopic?: string; nextOrder: number; current: string[] }) {
-  const { userId } = useAuth()
-  const { records: problems, status } = useQuery<ProblemData>('problems')
-  const { records: keys } = useQuery<AnswerKeyData>('answerKeys')
-  const { records: sessions } = useQuery<SessionData>('sessions')
   const problemMut = useMutations<Partial<ProblemData>>('problems')
   const keyMut = useMutations<Partial<AnswerKeyData>>('answerKeys')
+  const [bank, setBank] = useState<PastProblem[] | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [topic, setTopic] = useState(sessionTopic ?? '')
   const [q, setQ] = useState('')
   const [added, setAdded] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState<string | null>(null)
   const [order, setOrder] = useState(nextOrder)
 
-  const bank = useMemo(() => {
-    const keyByProblem = new Map(keys.filter((k) => k.createdBy === userId).map((k) => [k.data.problemId, k.data]))
-    const sessionById = new Map(sessions.filter((s) => s.createdBy === userId).map((s) => [s.recordId, s]))
-    const seen = new Set<string>()
-    return problems
-      .filter((p) => p.createdBy === userId && p.data.sessionId !== sessionId && p.data.followUp !== 1 && sessionById.has(p.data.sessionId))
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((p) => ({ p, key: keyByProblem.get(p.recordId), session: sessionById.get(p.data.sessionId)! }))
-      .filter((r) => {
-        const id = `${norm(r.p.data.prompt)}|${norm(r.key?.answer ?? '')}`
-        if (seen.has(id)) return false
-        seen.add(id)
-        return true
-      })
-  }, [problems, keys, sessions, userId, sessionId])
+  // One read when the panel opens (not a live subscription to everything you've written).
+  useEffect(() => {
+    let live = true
+    void callAction<{ problems: PastProblem[] }>('pastProblems', { excludeSessionId: sessionId }).then((r) => {
+      if (!live) return
+      if (r.ok) setBank(r.data.problems)
+      else setLoadError(r.error)
+    })
+    return () => {
+      live = false
+    }
+  }, [sessionId])
 
-  const weeks = TOPICS.filter((t) => bank.some((r) => r.session.data.topic === t.id))
+  const weeks = TOPICS.filter((t) => (bank ?? []).some((r) => r.topic === t.id))
   const needle = q.trim().toLowerCase()
-  const shown = bank
-    .filter((r) => !topic || r.session.data.topic === topic)
-    .filter((r) => !needle || r.p.data.prompt.toLowerCase().includes(needle) || r.session.data.title.toLowerCase().includes(needle))
+  const shown = (bank ?? [])
+    .filter((r) => !topic || r.topic === topic)
+    .filter((r) => !needle || r.prompt.toLowerCase().includes(needle) || r.sessionTitle.toLowerCase().includes(needle))
   const inSession = new Set(current.map(norm))
 
-  async function add(r: (typeof bank)[number]) {
-    setBusy(r.p.recordId)
+  async function add(r: PastProblem) {
+    setBusy(r.problemId)
     try {
       // After anything added meanwhile with the form above, too.
       const at = Math.max(order, nextOrder)
-      const problemId = await problemMut.createConfirmed({ sessionId, order: at, prompt: r.p.data.prompt })
-      if (r.key) await keyMut.createConfirmed({ problemId, answer: r.key.answer, expectedMistakes: r.key.expectedMistakes ?? '' })
+      const problemId = await problemMut.createConfirmed({ sessionId, order: at, prompt: r.prompt })
+      if (r.answer) await keyMut.createConfirmed({ problemId, answer: r.answer, expectedMistakes: r.expectedMistakes })
       setOrder(at + 1)
-      setAdded((s) => new Set(s).add(r.p.recordId))
+      setAdded((s) => new Set(s).add(r.problemId))
     } finally {
       setBusy(null)
     }
   }
 
-  if (status === 'loading') return <p className="mt-3 text-sm text-muted-foreground">Loading your problems…</p>
+  if (loadError) return <p role="alert" className="mt-3 text-sm text-destructive">{loadError}</p>
+  if (!bank) return <p className="mt-3 text-sm text-muted-foreground">Loading your problems…</p>
   if (bank.length === 0) {
     return <p className="mt-3 text-sm text-muted-foreground">Problems from your other sessions will show up here, ready to reuse.</p>
   }
@@ -114,17 +112,17 @@ function BankList({ sessionId, sessionTopic, nextOrder, current }: { sessionId: 
       ) : (
         <ul className="divide-y divide-border rounded-lg border border-border">
           {shown.slice(0, SHOW).map((r) => {
-            const already = added.has(r.p.recordId) || inSession.has(norm(r.p.data.prompt))
+            const already = added.has(r.problemId) || inSession.has(norm(r.prompt))
             return (
-              <li key={r.p.recordId} className="flex items-start justify-between gap-3 px-3 py-2" data-testid="problem-bank-row">
+              <li key={r.problemId} className="flex items-start justify-between gap-3 px-3 py-2" data-testid="problem-bank-row">
                 <div className="min-w-0 flex-1">
-                  <div className="overflow-x-auto text-foreground"><MathText source={r.p.data.prompt} /></div>
+                  <div className="overflow-x-auto text-foreground"><MathText source={r.prompt} /></div>
                   <p className="text-xs text-muted-foreground">
-                    Answer: {r.key ? <KeyMath answer={r.key.answer} /> : 'none'} · from “{r.session.data.title}”
+                    Answer: {r.answer ? <KeyMath answer={r.answer} /> : 'none'} · from “{r.sessionTitle}”
                   </p>
                 </div>
                 <Button size="sm" variant="outline" disabled={already || busy !== null || !problemMut.ready || !keyMut.ready} onClick={() => add(r)} data-testid="problem-bank-add">
-                  {already ? 'Added' : busy === r.p.recordId ? 'Adding…' : 'Add'}
+                  {already ? 'Added' : busy === r.problemId ? 'Adding…' : 'Add'}
                 </Button>
               </li>
             )
