@@ -6,6 +6,8 @@
 
 In group tutoring, most wrong answers share a few root causes, but the tutor sees them one desk at a time. **TutorPulse** is a live room for group tutoring. Students join from a phone with a code or QR, write their working on a sketch pad and type a final answer. Answers are checked exactly, and the wrong ones are grouped by AI into named misconceptions ("Forgot the inner derivative · 3") on the tutor's board while the session runs. The tutor takes a group to the board, students revise, and a follow-up problem sent to that group checks whether the mistake really cleared. Afterwards students get a typeset practice set aimed at the room's real mistakes, and those who opted in get an email recap of their own results.
 
+**Scope:** the core loop shipped as the requirements doc planned it. Once it was solid I grew the app toward what a tutor needs before and after a session too: history across sessions, a weekly digest email, session reports, a reusable problem bank, problem timers and dark mode.
+
 - Live: **https://tutorpulse.app.space** · 2-minute demo video: `docs/demo/tutorpulse-demo.mp4`
 - Test accounts: `tutor-1@deepspace.test` (tutor) and seven students (Maya, Jordan, Priya, Leo, Sam, A, B). Passwords shared privately.
 
