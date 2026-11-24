@@ -1,4 +1,4 @@
-# TutorPulse: writeup (draft)
+# TutorPulse: writeup
 
 ## 1. What I built
 
