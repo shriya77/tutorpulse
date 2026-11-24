@@ -1,6 +1,8 @@
 # TutorPulse — Requirements Document
 
-Nov 21, 2026 · @Adi
+Nov 21, 2026 · Shriya Kalyan
+
+> **Read this as the plan, not the result.** It was written before the build. The core loop shipped as planned, and once it was solid the scope grew past it: some things listed below as non-goals or "next steps" were built after all, among them reading handwritten and photographed working, history across sessions, recap and weekly digest emails, and follow-up checks. [README.md](../README.md) describes what TutorPulse does now, and [AGENT_LOG.md](AGENT_LOG.md) records each change and why.
 
 ## Overview
 
@@ -35,8 +37,8 @@ Ship by Tuesday, Nov 24, 11:59 PM ET: a deployed app where a tutor and several s
 - Video or audio calls. Most group tutoring is in a room or already on Zoom; adding LiveKit would add cost and failure points without improving the core moment.
 - Payments. Group tutors at a university don't charge per session, and nothing in the core flow needs billing.
 - Grades, gradebooks, or LMS sync. TutorPulse is formative (during learning), not an assessment tool.
-- Handwriting or photo recognition of work. Typed answers plus a one-line explanation are enough for clustering and much more reliable in four days.
-- Long-term student analytics across many sessions (listed as a next step).
+- Handwriting or photo recognition of work. Typed answers plus a one-line explanation are enough for clustering and much more reliable in four days. *(Later built anyway, as an optional sketch pad and photo of paper alongside the typed answer; see the README's whiteboard section.)*
+- Long-term student analytics across many sessions (listed as a next step). *(Later built: the History page and the weekly digest.)*
 
 **Success criteria for the submission**
 
