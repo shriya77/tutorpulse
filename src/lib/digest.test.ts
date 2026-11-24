@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildDigest, isEmptyDigest } from './digest'
+import { buildDigest } from './digest'
 import { buildHistory } from './history'
 
 const input = {
@@ -53,9 +53,5 @@ describe('buildDigest', () => {
     const m = buildDigest({ tutorName: 'T', from: new Date('2026-11-16T14:00:00Z'), to: new Date('2026-11-24T02:30:00Z'), week: late, month: late, historyUrl: 'h', settingsUrl: 's' })
     expect(m.text).toContain('- Sun, Nov 22: Chain rule')
     expect(m.text).toContain('Nov 16 to Nov 23')
-  })
-
-  it('is empty when nothing ran', () => {
-    expect(isEmptyDigest({ week: buildHistory({ ...input, sessions: [], submissions: [], clusters: [] }) })).toBe(true)
   })
 })

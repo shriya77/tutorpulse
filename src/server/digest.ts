@@ -13,7 +13,7 @@
 import { isTestAccountEmail } from 'deepspace/worker'
 import type { ActionTools } from 'deepspace/worker'
 import type { Envelope, ClusterData, SessionData, SubmissionData } from '../actions/types'
-import { buildDigest, isEmptyDigest, type DigestEmail } from '../lib/digest'
+import { buildDigest, type DigestEmail } from '../lib/digest'
 import { buildHistory, type HistoryInput } from '../lib/history'
 
 export type Reader = (collection: string, where: Record<string, unknown>, limit?: number) => Promise<Envelope<Record<string, unknown>>[]>
@@ -37,9 +37,22 @@ async function nameOf(read: Reader, userId: string): Promise<string> {
   return typeof u === 'string' && u.trim() ? u.trim().slice(0, 80) : ''
 }
 
+/** Run `fn` over `items`, `size` at a time (parallel within a batch, so one run doesn't flood the tools API). */
+async function inBatches<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = []
+  for (let i = 0; i < items.length; i += size) out.push(...(await Promise.all(items.slice(i, i + size).map(fn))))
+  return out
+}
+
+const BATCH = 10
+
 async function historyInput(read: Reader, sessions: Envelope<SessionData>[]): Promise<HistoryInput> {
   const input: HistoryInput = { sessions: [], submissions: [], clusters: [], names: {} }
-  for (const s of sessions) {
+  const perSession = await inBatches(sessions, BATCH, async (s) => {
+    const [subs, clusters] = await Promise.all([read('submissions', { sessionId: s.recordId }), read('clusters', { sessionId: s.recordId }, 200)])
+    return { s, subs: subs as unknown as Envelope<SubmissionData>[], clusters: clusters as unknown as Envelope<ClusterData>[] }
+  })
+  for (const { s, subs, clusters } of perSession) {
     input.sessions.push({
       id: s.recordId,
       title: s.data.title,
@@ -48,21 +61,29 @@ async function historyInput(read: Reader, sessions: Envelope<SessionData>[]): Pr
       participantIds: Array.isArray(s.data.participantIds) ? s.data.participantIds : [],
       topic: s.data.topic,
     })
-    for (const x of (await read('submissions', { sessionId: s.recordId })) as unknown as Envelope<SubmissionData>[]) {
+    for (const x of subs) {
       input.submissions.push({ id: x.recordId, sessionId: s.recordId, studentId: x.data.studentId, problemId: x.data.problemId, isCorrect: x.data.isCorrect })
     }
-    for (const c of (await read('clusters', { sessionId: s.recordId }, 200)) as unknown as Envelope<ClusterData>[]) {
+    for (const c of clusters) {
       input.clusters.push({ sessionId: s.recordId, label: c.data.label, submissionIds: Array.isArray(c.data.submissionIds) ? c.data.submissionIds : [] })
     }
   }
   const ids = new Set<string>()
   for (const s of input.sessions) for (const p of s.participantIds) ids.add(p)
   for (const x of input.submissions) ids.add(x.studentId)
-  for (const id of [...ids].slice(0, MAX_NAMES)) {
-    const n = await nameOf(read, id)
-    if (n) input.names[id] = n
-  }
+  const named = await inBatches([...ids].slice(0, MAX_NAMES), BATCH, async (id) => [id, await nameOf(read, id)] as const)
+  for (const [id, n] of named) if (n) input.names[id] = n
   return input
+}
+
+/** The part of a 4-week input that falls in the past 7 days (names are shared). */
+function onlySessions(input: HistoryInput, ids: Set<string>): HistoryInput {
+  return {
+    sessions: input.sessions.filter((s) => ids.has(s.id)),
+    submissions: input.submissions.filter((x) => ids.has(x.sessionId)),
+    clusters: input.clusters.filter((c) => ids.has(c.sessionId)),
+    names: input.names,
+  }
 }
 
 /** The tutor's digest for the 7 days up to `now`, or null when they ran no sessions in it. */
@@ -72,19 +93,19 @@ export async function buildTutorDigest(read: Reader, tutorId: string, now: Date,
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   const weekStart = now.getTime() - 7 * DAY_MS
   const monthStart = now.getTime() - 28 * DAY_MS
-  const week = own.filter((s) => Date.parse(s.createdAt) >= weekStart).slice(0, MAX_SESSIONS)
-  if (week.length === 0) return null
+  // Newest first, so the week's sessions are always inside the month's first MAX_SESSIONS.
   const month = own.filter((s) => Date.parse(s.createdAt) >= monthStart).slice(0, MAX_SESSIONS)
-  const weekHistory = buildHistory(await historyInput(read, week))
-  if (isEmptyDigest({ week: weekHistory })) return null
-  const monthHistory = buildHistory(await historyInput(read, month))
+  const weekIds = new Set(month.filter((s) => Date.parse(s.createdAt) >= weekStart).map((s) => s.recordId))
+  if (weekIds.size === 0) return null
+  // Read the 4 weeks once; the week is a filter of it.
+  const monthInput = await historyInput(read, month)
   const base = `https://${appName}.app.space`
   return buildDigest({
     tutorName: await nameOf(read, tutorId),
     from: new Date(weekStart),
     to: now,
-    week: weekHistory,
-    month: monthHistory,
+    week: buildHistory(onlySessions(monthInput, weekIds)),
+    month: buildHistory(monthInput),
     historyUrl: `${base}/history`,
     settingsUrl: `${base}/settings`,
   })

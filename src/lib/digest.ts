@@ -45,11 +45,6 @@ const day = (iso: string) => new Date(iso).toLocaleDateString('en-US', { weekday
 const range = (a: Date, b: Date) =>
   `${a.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: DIGEST_TIME_ZONE })} to ${b.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: DIGEST_TIME_ZONE })}`
 
-/** Nothing ran in the week: no email is sent (an empty digest is just noise). */
-export function isEmptyDigest(input: Pick<DigestInput, 'week'>): boolean {
-  return input.week.sessions.length === 0
-}
-
 export function buildDigest(input: DigestInput): DigestEmail {
   const { sessions, students } = input.week
   const answers = sessions.reduce((n, s) => n + s.answers, 0)
