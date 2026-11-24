@@ -11,8 +11,11 @@
  * "Correct" climbs.
  * Four students act through the same server actions the app's buttons call;
  * Maya acts on her (recorded) phone. The others' working is rendered in a
- * handwriting font and uploaded to their own folders, like the pad does. Captions are injected into the recorded
- * tutor page only — they are not part of the app. Spends a few AI credits.
+ * handwriting font and uploaded to their own folders, like the pad does.
+ * Captions are written for a first-time viewer (the problem first, then what
+ * each screen is, the maths in plain words) and sit on the tutor's screen; a
+ * small label on each screen says whose it is. Neither is part of the app.
+ * Spends a few AI credits.
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { test, expect, type BrowserContext, type Page } from '@playwright/test'
@@ -90,6 +93,24 @@ async function caption(page: Page, text: string) {
     }
     el.textContent = t
   }, text)
+}
+
+/** A small, permanent label in a corner saying whose screen this is (not part of the app). */
+async function screenLabel(page: Page, text: string, where: 'bottom-left' | 'bottom-center') {
+  await page.evaluate(
+    ({ t, w }) => {
+      const el = document.getElementById('demo-screen-label') ?? document.createElement('div')
+      el.id = 'demo-screen-label'
+      el.setAttribute('style', [
+        'position:fixed', 'bottom:14px', w === 'bottom-left' ? 'left:14px' : 'left:50%', w === 'bottom-left' ? '' : 'transform:translateX(-50%)',
+        'z-index:99999', 'pointer-events:none', 'background:#ffe45c', 'color:#1d2b3a', 'font:700 15px/1.2 "Source Sans 3",system-ui,sans-serif',
+        'padding:6px 14px', 'border-radius:999px', 'box-shadow:0 4px 14px rgba(0,0,0,.18)', 'white-space:nowrap',
+      ].filter(Boolean).join(';'))
+      el.textContent = t
+      document.body.appendChild(el)
+    },
+    { t: text, w: where },
+  )
 }
 
 test('record the TutorPulse demo', async ({ browser, baseURL }) => {
@@ -177,11 +198,17 @@ test('record the TutorPulse demo', async ({ browser, baseURL }) => {
   await tutor.page.goto(`/sessions/${sessionId}`)
   await expect(tutor.page.getByTestId('join-qr')).toBeVisible({ timeout: 20_000 })
   await maya.page.goto('/home')
+  await screenLabel(tutor.page, 'Tutor’s laptop', 'bottom-left')
+  await screenLabel(maya.page, 'A student’s phone (Maya)', 'bottom-center')
   const sceneStart = Date.now()
-  await caption(tutor.page, 'TutorPulse: a live room for group tutoring.')
+  await caption(tutor.page, 'In group tutoring, a tutor can see who got a problem wrong, but not why.')
+  await pause(5000)
+  await caption(tutor.page, 'TutorPulse groups the wrong answers by the mistake behind them, live, during the session.')
+  await pause(5500)
+  await caption(tutor.page, 'Left: the tutor’s laptop. Right: Maya’s phone, one of five students.')
   await pause(4500)
-  await caption(tutor.page, 'A Calc I chain rule session. Students scan the QR code to join.')
-  await pause(3000)
+  await caption(tutor.page, 'A Calculus I problem on the chain rule. Students join by scanning the QR code or typing the code.')
+  await pause(3500)
   await maya.page.getByTestId('join-code-input').pressSequentially(joinCode, { delay: 140 })
   await maya.page.getByTestId('join-submit').click()
   for (const s of others) {
@@ -203,13 +230,13 @@ test('record the TutorPulse demo', async ({ browser, baseURL }) => {
     ['Priya', 'cos(3x^2)', 'just took the derivative of the sin part'],
     ['Sam', '-6x*cos(3x^2)', 'derivative of sin is negative cos'],
   ]
-  await caption(tutor.page, 'Students show their working on a sketch pad, with a finger or stylus.')
+  await caption(tutor.page, 'Students write their working on a sketch pad, with a finger or stylus…')
   await writeOnPad(maya.page, [
     { text: 'sin(3x²)', row: 0 },
     { text: '= cos(3x²)', row: 1 },
   ])
   await pause(600)
-  await caption(tutor.page, 'Then type the final answer. Each one is checked exactly by maths, not by AI.')
+  await caption(tutor.page, '…then type the final answer. Right or wrong is checked by maths, not guessed by AI.')
   await maya.page.getByTestId('answer-input').scrollIntoViewIfNeeded()
   await maya.page.getByTestId('answer-input').pressSequentially('cos(3x^2)', { delay: 90 })
   await maya.page.getByTestId('submit-answer').click()
@@ -220,35 +247,35 @@ test('record the TutorPulse demo', async ({ browser, baseURL }) => {
   await expect(tutor.page.getByTestId('stat-submitted').first()).toHaveText('5', { timeout: 20_000 })
 
   // ── Scene 3: the misconception radar (≈0:35) ────────────────────────────
-  await caption(tutor.page, 'The wrong answers are grouped by why they are wrong, reading the working too.')
+  await caption(tutor.page, 'The right answer is 6x·cos(3x²). AI now groups the wrong ones by the mistake behind them, reading each student’s working too.')
   const topCount = tutor.page.getByTestId('cluster-count').first()
   await expect(topCount).toHaveText('3', { timeout: 90_000 })
   await focusOn(tutor.page, 'cluster')
   await pause(8000)
   const topLabel = (await tutor.page.getByTestId('cluster-label').first().textContent())!.trim()
-  await caption(tutor.page, `“${topLabel}”: 3 of 5 students. One explanation can fix most of the room.`)
-  await pause(3000)
+  await caption(tutor.page, `“${topLabel}”: 3 of the 5 students left out the 6x. One explanation can fix most of the room.`)
+  await pause(5000)
   await tutor.page.getByTestId('cluster-toggle').first().click()
   await focusOn(tutor.page, 'cluster')
-  await caption(tutor.page, 'The tutor sees the answers and working behind it, without names.')
+  await caption(tutor.page, 'The tutor can open the group to see the answers and working in it, without names (safe on a projector).')
   await pause(5000)
   const thumb = tutor.page.getByTestId('work-thumb').first()
   await expect(thumb.locator('img')).toBeVisible({ timeout: 15_000 })
   await thumb.click()
   await focusOn(tutor.page, 'work-thumb')
-  await caption(tutor.page, 'Tap the working to enlarge it: the inner derivative never appears.')
+  await caption(tutor.page, 'Tap a student’s working to enlarge it: the 6x never appears.')
   await pause(7000)
   await thumb.click()
   await focusOn(tutor.page, 'cluster')
 
   // ── Scene 4: take it to the board (≈1:00) ───────────────────────────────
-  await caption(tutor.page, 'Take it to the board: every student sees the topic on their screen.')
+  await caption(tutor.page, 'One tap puts that mistake at the top of every student’s screen while the tutor explains it.')
   await tutor.page.getByTestId('take-to-board').first().click()
   await expect(maya.page.getByTestId('focus-banner')).toContainText(topLabel, { timeout: 15_000 })
   await pause(9000)
 
   // ── Scene 5: students revise, the count drops (≈1:10) ───────────────────
-  await caption(tutor.page, 'After the explanation, students revise. Watch the count fall.')
+  await caption(tutor.page, 'After the explanation, students fix their answers. Watch that group shrink.')
   await writeOnPad(maya.page, [{ text: '= 6x cos(3x²)', row: 2 }])
   await maya.page.getByTestId('answer-input').scrollIntoViewIfNeeded()
   await maya.page.getByTestId('answer-input').fill('')
@@ -263,9 +290,11 @@ test('record the TutorPulse demo', async ({ browser, baseURL }) => {
   await expect(topCount).toHaveText('1', { timeout: 30_000 })
   await focusOn(tutor.page, 'board-problem')
   await pause(3000)
-  await caption(tutor.page, 'Correct went from 1 to 3. The group shrank from 3 students to 1.')
-  await pause(9000)
-  await caption(tutor.page, 'TutorPulse: see why, teach once, watch it land.')
+  await caption(tutor.page, 'Correct went from 1 to 3, and the group from 3 students to 1, in about a minute.')
+  await pause(7000)
+  await caption(tutor.page, 'Also in TutorPulse: photos of paper working, follow-up checks, practice-set PDFs, recap emails, and progress over time.')
+  await pause(7000)
+  await caption(tutor.page, 'TutorPulse: see why, teach once, watch it land.  tutorpulse.app.space')
   await pause(5000)
   const sceneEnd = Date.now()
 
