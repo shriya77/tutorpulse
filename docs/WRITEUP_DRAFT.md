@@ -42,4 +42,4 @@ Left out on purpose: video and messaging (tutoring already happens in the room o
 - **Brought the domain knowledge:** eight Calc I study-group problem packets (one worked by me) and my misconceptions write-up, which became the per-week library behind the cluster labels.
 - **Had the whiteboard idea:** group students by their written working rather than a one-line reason. I then dropped the redundant explanation box.
 
-**Tried for real:** two students with the same wrong answer, one writing on the phone pad and one photographing paper, were split into the two right mistake groups from their handwriting alone. **Unfinished:** a real room of rushed handwriting; the README's limitations list has the rest. **Next:** a weekly misconception digest.
+**Tried for real:** two students with the same wrong answer, one writing on the phone pad and one photographing paper, were split into the two right mistake groups from their handwriting alone. **Unfinished:** a real room of rushed handwriting; the README's limitations list has the rest. **Next:** a starter problem bank for each course week, and export to the school's LMS.
