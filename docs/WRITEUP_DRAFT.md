@@ -4,7 +4,7 @@
 
 In group tutoring, most wrong answers share a few root causes, but the tutor sees them one desk at a time. **TutorPulse** is a live room for group tutoring. Students join from a phone with a code or QR, write their working on a sketch pad and type a final answer. Answers are checked exactly, and AI groups the wrong ones into named misconceptions ("Forgot the inner derivative · 3") on the tutor's board while the session runs. The tutor takes a group to the board, students revise, and a follow-up problem checks whether the mistake really cleared. Afterwards students get a practice set aimed at the room's real mistakes.
 
-**Scope:** the core loop shipped as planned. Once it was solid I grew the app toward what a tutor needs before and after a session: history across sessions, a weekly digest, session reports, a problem bank and timers.
+**Scope:** the core loop shipped as planned. Once it was solid I grew the app toward what a tutor needs before and after a session: history across sessions, a weekly digest, session reports, a problem bank and timers. For one overnight batch I chose the five features and left the build decisions to the agent, then tried them on the live app myself; that's where the handwriting trial below came from.
 
 - Live: **https://tutorpulse.app.space** · 2-minute demo video: **https://tutorpulse.app.space/demo.mp4**
 - Test accounts: `tutor-1@deepspace.test` (tutor) and seven students (Maya, Jordan, Priya, Leo, Sam, A, B); passwords are in the submission form. To see groups appear, sign in as the tutor in one window and as two or three students in others (private windows or a phone), and give the same wrong answer twice.
@@ -33,7 +33,7 @@ Left out on purpose: video and messaging (tutoring already happens in the room o
 
 ## 5. What I verified, decided and changed
 
-- **Set the rules:** wrote the requirements and build prompt, including the security rules and the dependency list.
+- **Set the rules:** wrote the requirements and build prompt, including the dependency list and the security model: DeepSpace server actions skip row-level permissions, so every action must pass a shared tutor/participant check and only server code may write answers and groups.
 - **Made the calls:** re-scaffold on the new SDK, owner-billed hints, LaTeX and email as the integrations, and which fixes to build from a review of the whole app.
 - **Tested it myself:** joined a live session as a student, ran `sessionReport` against the live app and confirmed a real recap email arrived.
 - **Fixed what I found using it:** an image-upload glitch on my laptop; on my phone, zoom and a drawing mode that locks the page, then a steadier two-finger move after testing it sideways.
@@ -42,4 +42,4 @@ Left out on purpose: video and messaging (tutoring already happens in the room o
 - **Brought the domain knowledge:** eight Calc I study-group packets (one worked by me) and my misconceptions write-up, which became the library behind the cluster labels.
 - **Had the whiteboard idea:** group students by their written working, not a one-line reason, then dropped the redundant explanation box.
 
-**Tried for real:** two students with the same wrong answer, one on the phone pad and one photographing paper, landed in the two right mistake groups from their handwriting alone. **Unfinished:** a real room of rushed handwriting, and the newest features pass their automated tests but I haven't tried them by hand yet; the README lists the rest. **Next:** a starter problem bank per course week, and LMS export.
+**Tried for real:** two students with the same wrong answer, one on the phone pad and one photographing paper, landed in the two right mistake groups from their handwriting alone. I also checked the newest features by hand on the live app: the weekly email preview, a full session on my phone and dark mode. **Unfinished:** a real room of rushed handwriting; the README lists the rest. **Next:** a starter problem bank per course week, and LMS export.
