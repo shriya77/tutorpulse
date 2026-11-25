@@ -15,6 +15,15 @@ const STEPS = [
   { title: 'Leave with practice', body: 'End the session and get a PDF of new problems that target the mistakes your group actually made.' },
 ]
 
+const ALSO = [
+  'Follow-up problems that check whether a mistake really cleared',
+  'A hint assistant that nudges instead of giving the answer',
+  'Each student’s own results, and an opt-in recap email',
+  'History across sessions, with a weekly summary email',
+  'Problem timers, a reusable problem bank and session reports',
+  'Dark mode, and a layout that works on a phone',
+]
+
 export default function Landing() {
   return (
     <>
@@ -36,6 +45,13 @@ export default function Landing() {
             >
               Open TutorPulse
             </Link>
+            <a
+              href="/demo.mp4"
+              className="inline-flex items-center rounded-full border border-border bg-card px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
+              data-testid="landing-demo-video"
+            >
+              Watch the 2-minute demo
+            </a>
             <span className="self-center text-sm text-muted-foreground">Have a code? Open TutorPulse and enter it.</span>
           </div>
         </header>
@@ -48,6 +64,14 @@ export default function Landing() {
             </li>
           ))}
         </ol>
+        <section aria-labelledby="also-title" className="space-y-2">
+          <h2 id="also-title" className="font-display text-lg font-semibold text-foreground">Also in TutorPulse</h2>
+          <ul className="grid gap-x-6 gap-y-1.5 text-sm text-muted-foreground sm:grid-cols-2">
+            {ALSO.map((a) => (
+              <li key={a}>{a}</li>
+            ))}
+          </ul>
+        </section>
         <p className="text-xs text-muted-foreground">
           Built on DeepSpace. Correctness is checked by maths, not AI; AI only names the mistakes.
         </p>
