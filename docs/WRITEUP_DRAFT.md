@@ -7,7 +7,7 @@ In group tutoring, most wrong answers share a few root causes, but the tutor see
 **Scope:** the core loop shipped as planned. Once it was solid I grew the app toward what a tutor needs before and after a session: history across sessions, a weekly digest, session reports, a problem bank and timers.
 
 - Live: **https://tutorpulse.app.space** · 2-minute demo video: `docs/demo/tutorpulse-demo.mp4`
-- Test accounts: `tutor-1@deepspace.test` (tutor) and seven students (Maya, Jordan, Priya, Leo, Sam, A, B). Passwords shared privately.
+- Test accounts: `tutor-1@deepspace.test` (tutor) and seven students (Maya, Jordan, Priya, Leo, Sam, A, B); passwords are in the submission form. To see groups appear, sign in as the tutor in one window and as two or three students in others (private windows or a phone), and give the same wrong answer twice.
 
 ## 2. DeepSpace primitives used
 
